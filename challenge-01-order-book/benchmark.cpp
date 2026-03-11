@@ -5,7 +5,6 @@
 #include "solution/solution.h"
 
 #include <vector>
-#include <algorithm>
 
 namespace {
 
@@ -57,6 +56,25 @@ std::vector<Operation> generate_workload(size_t n) {
     return ops;
 }
 
+void run_workload(hftu::OrderBook& book, const std::vector<Operation>& ops) {
+    for (const auto& op : ops) {
+        switch (op.type) {
+            case Operation::ADD:
+                book.add_order(op.id, op.side, op.price, op.quantity);
+                break;
+            case Operation::CANCEL:
+                book.cancel_order(op.id);
+                break;
+            case Operation::BEST_BID:
+                hftu::do_not_optimize(book.best_bid());
+                break;
+            case Operation::BEST_ASK:
+                hftu::do_not_optimize(book.best_ask());
+                break;
+        }
+    }
+}
+
 } // namespace
 
 static void BM_Solution(benchmark::State& state) {
@@ -64,26 +82,18 @@ static void BM_Solution(benchmark::State& state) {
 
     for (auto _ : state) {
         hftu::OrderBook book;
-        for (const auto& op : ops) {
-            switch (op.type) {
-                case Operation::ADD:
-                    book.add_order(op.id, op.side, op.price, op.quantity);
-                    break;
-                case Operation::CANCEL:
-                    book.cancel_order(op.id);
-                    break;
-                case Operation::BEST_BID:
-                    hftu::do_not_optimize(book.best_bid());
-                    break;
-                case Operation::BEST_ASK:
-                    hftu::do_not_optimize(book.best_ask());
-                    break;
-            }
-        }
+
+        // Measure cycles: CPUID+RDTSC before, RDTSCP+CPUID after (Intel recommended)
+        uint64_t start = hftu::cycle_start();
+        run_workload(book, ops);
         hftu::clobber();
+        uint64_t end = hftu::cycle_end();
+
+        state.counters["cycles"] = static_cast<double>(end - start);
+        state.counters["cycles_per_op"] = static_cast<double>(end - start) / static_cast<double>(ops.size());
     }
 
     state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(ops.size()));
 }
 
-BENCHMARK(BM_Solution)->Unit(benchmark::kNanosecond);
+BENCHMARK(BM_Solution)->Unit(benchmark::kNanosecond)->UseRealTime();

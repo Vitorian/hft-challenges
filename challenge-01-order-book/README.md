@@ -20,7 +20,7 @@ Implement a limit order book that supports:
 ## What We Benchmark
 
 - Mixed workload: 60% adds, 20% cancels, 10% best_bid, 10% best_ask
-- Measured in nanoseconds per operation (lower is better)
+- Measured in x86-64 CPU cycles per operation via `rdtscp` (lower is better)
 
 ## Files
 
