@@ -1,0 +1,42 @@
+title: "Challenge 01: Order Book"
+slug: order-book
+description: |
+  Build a high-performance **limit order book** that supports:
+
+  - **Add order** — insert a new limit order (buy or sell) with a unique ID, side, price, and quantity
+  - **Cancel order** — remove an order by ID
+  - **Best bid** — return the highest buy price (or 0 if no bids)
+  - **Best ask** — return the lowest sell price (or 0 if no asks)
+
+  Your implementation goes in `solution/solution.h` and `solution/solution.cpp`.
+  The benchmark measures **CPU cycles per operation** across mixed workloads.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+  class OrderBook {
+  public:
+      void add_order(uint64_t id, int side, int64_t price, int64_t quantity);
+      void cancel_order(uint64_t id);
+      int64_t best_bid() const;
+      int64_t best_ask() const;
+  };
+  }
+  ```
+
+  - `side`: 0 = buy, 1 = sell
+  - Return 0 from `best_bid()`/`best_ask()` if no orders on that side
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-01-order-book
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 60
+memory_limit_mb: 512
+daily_submission_limit: 5
+published: true
