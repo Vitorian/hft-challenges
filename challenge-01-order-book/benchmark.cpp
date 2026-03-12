@@ -8,7 +8,6 @@
 
 namespace {
 
-// Pre-generate a workload
 struct Operation {
     enum Type : uint8_t { ADD, CANCEL, BEST_BID, BEST_ASK };
     Type type;
@@ -33,12 +32,10 @@ std::vector<Operation> generate_workload(size_t n) {
     for (size_t i = 0; i < n; ++i) {
         int r = op_dist(gen);
         if (r < 60) {
-            // 60% add
             ops.push_back({Operation::ADD, next_id++, side_dist(gen),
                            price_dist(gen), qty_dist(gen)});
             active_ids.push_back(next_id - 1);
         } else if (r < 80 && !active_ids.empty()) {
-            // 20% cancel
             std::uniform_int_distribution<size_t> idx_dist(0, active_ids.size() - 1);
             size_t idx = idx_dist(gen);
             uint64_t cancel_id = active_ids[idx];
@@ -46,10 +43,8 @@ std::vector<Operation> generate_workload(size_t n) {
             active_ids.pop_back();
             ops.push_back({Operation::CANCEL, cancel_id, 0, 0, 0});
         } else if (r < 90) {
-            // 10% best_bid
             ops.push_back({Operation::BEST_BID, 0, 0, 0, 0});
         } else {
-            // 10% best_ask
             ops.push_back({Operation::BEST_ASK, 0, 0, 0, 0});
         }
     }
@@ -77,23 +72,25 @@ void run_workload(hftu::OrderBook& book, const std::vector<Operation>& ops) {
 
 } // namespace
 
-static void BM_Solution(benchmark::State& state) {
-    const auto ops = generate_workload(100'000);
+static hftu::RegisterBenchmark reg_solution(
+    "BM_Solution", 100'000,
+    [](int iterations) -> uint64_t {
+        const auto ops = generate_workload(100'000);
+        uint64_t total_cycles = 0;
 
-    for (auto _ : state) {
-        hftu::OrderBook book;
-
-        // Measure cycles: CPUID+RDTSC before, RDTSCP+CPUID after (Intel recommended)
-        uint64_t start = hftu::cycle_start();
-        run_workload(book, ops);
-        hftu::clobber();
-        uint64_t end = hftu::cycle_end();
-
-        state.counters["cycles"] = static_cast<double>(end - start);
-        state.counters["cycles_per_op"] = static_cast<double>(end - start) / static_cast<double>(ops.size());
+        for (int i = 0; i < iterations; ++i) {
+            hftu::OrderBook book;
+            uint64_t start = hftu::cycle_start();
+            run_workload(book, ops);
+            hftu::clobber();
+            uint64_t end = hftu::cycle_end();
+            total_cycles += (end - start);
+        }
+        return total_cycles;
     }
+);
 
-    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(ops.size()));
+int main() {
+    hftu::run_benchmarks();
+    return 0;
 }
-
-BENCHMARK(BM_Solution)->Unit(benchmark::kNanosecond)->UseRealTime();
