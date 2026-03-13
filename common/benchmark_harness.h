@@ -9,7 +9,10 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <random>
+#include <string>
 #include <vector>
 #include <algorithm>
 #include <functional>
@@ -20,7 +23,6 @@ namespace hftu {
 // TSC cycle measurement
 // ---------------------------------------------------------------------------
 
-// Start measurement: CPUID serializes the pipeline, then RDTSC reads the counter.
 inline uint64_t cycle_start() {
     uint32_t lo, hi;
     asm volatile(
@@ -33,7 +35,6 @@ inline uint64_t cycle_start() {
     return (static_cast<uint64_t>(hi) << 32) | lo;
 }
 
-// End measurement: RDTSCP reads TSC and serializes, then CPUID drains.
 inline uint64_t cycle_end() {
     uint32_t lo, hi, aux;
     asm volatile(
@@ -52,7 +53,6 @@ inline uint64_t cycle_end() {
 // Compiler barriers
 // ---------------------------------------------------------------------------
 
-// Prevent compiler from optimizing away a value
 template <typename T>
 inline void do_not_optimize(T const& value) {
     asm volatile("" : : "r,m"(value) : "memory");
@@ -63,7 +63,6 @@ inline void do_not_optimize(T& value) {
     asm volatile("" : "+r,m"(value) : : "memory");
 }
 
-// Prevent compiler from reordering memory operations across this point
 inline void clobber() {
     asm volatile("" : : : "memory");
 }
@@ -78,6 +77,49 @@ inline std::mt19937_64& rng() {
 }
 
 // ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+using ValidateFn = std::function<bool()>;
+
+struct ValidateDef {
+    const char* name;
+    ValidateFn fn;
+};
+
+inline std::vector<ValidateDef>& validate_registry() {
+    static std::vector<ValidateDef> reg;
+    return reg;
+}
+
+struct RegisterValidation {
+    RegisterValidation(const char* name, ValidateFn fn) {
+        validate_registry().push_back({name, std::move(fn)});
+    }
+};
+
+// Check helper: prints FAIL message and returns false
+inline bool check_failed(const char* test, const char* msg) {
+    std::fprintf(stderr, "FAIL [%s]: %s\n", test, msg);
+    return false;
+}
+
+// Run all validations. Returns true if all pass.
+inline bool run_validations() {
+    auto& reg = validate_registry();
+    if (reg.empty()) return true;
+
+    std::fprintf(stderr, "Running %zu validation(s)...\n", reg.size());
+    bool all_pass = true;
+    for (auto& v : reg) {
+        bool ok = v.fn();
+        std::fprintf(stderr, "  %s: %s\n", v.name, ok ? "PASS" : "FAIL");
+        if (!ok) all_pass = false;
+    }
+    return all_pass;
+}
+
+// ---------------------------------------------------------------------------
 // Benchmark runner
 // ---------------------------------------------------------------------------
 
@@ -88,13 +130,13 @@ struct BenchmarkResult {
     uint64_t total_cycles;
 };
 
-// A benchmark function: given iteration count, returns total_cycles
 using BenchmarkFn = std::function<uint64_t(int iterations)>;
 
 struct BenchmarkDef {
     const char* name;
     uint64_t ops_per_iteration;
     BenchmarkFn fn;
+    int fixed_iterations;  // 0 = auto-calibrate
 };
 
 inline std::vector<BenchmarkDef>& benchmark_registry() {
@@ -103,21 +145,15 @@ inline std::vector<BenchmarkDef>& benchmark_registry() {
 }
 
 struct RegisterBenchmark {
-    RegisterBenchmark(const char* name, uint64_t ops, BenchmarkFn fn) {
-        benchmark_registry().push_back({name, ops, std::move(fn)});
+    RegisterBenchmark(const char* name, uint64_t ops, BenchmarkFn fn, int fixed_iters = 0) {
+        benchmark_registry().push_back({name, ops, std::move(fn), fixed_iters});
     }
 };
 
-// Calibrate iteration count using TSC cycles.
-// We want enough iterations for stable measurement — target ~1 billion cycles total.
 inline int calibrate(const BenchmarkFn& fn) {
-    // Warmup
-    fn(1);
-
-    // Time a single iteration in cycles
+    fn(1);  // warmup
     uint64_t single_cycles = fn(1);
 
-    // Target ~1 billion cycles total
     constexpr uint64_t TARGET_CYCLES = 1'000'000'000ULL;
     int n = static_cast<int>(TARGET_CYCLES / std::max(single_cycles, uint64_t(1)));
     n = std::max(n, 3);
@@ -125,14 +161,20 @@ inline int calibrate(const BenchmarkFn& fn) {
     return n;
 }
 
-inline void run_benchmarks() {
+inline int run_benchmarks() {
+    // Validate first — refuse to benchmark incorrect solutions
+    if (!run_validations()) {
+        std::printf("{\"error\": \"Validation failed\", \"benchmarks\": []}\n");
+        return 1;
+    }
+
     auto& reg = benchmark_registry();
 
     std::vector<BenchmarkResult> results;
     results.reserve(reg.size());
 
     for (auto& def : reg) {
-        int iters = calibrate(def.fn);
+        int iters = def.fixed_iterations > 0 ? def.fixed_iterations : calibrate(def.fn);
         uint64_t cycles = def.fn(iters);
         results.push_back({def.name, def.ops_per_iteration,
                           static_cast<uint64_t>(iters), cycles});
@@ -154,6 +196,7 @@ inline void run_benchmarks() {
         std::printf("    }%s\n", (i + 1 < results.size()) ? "," : "");
     }
     std::printf("  ]\n}\n");
+    return 0;
 }
 
 } // namespace hftu
