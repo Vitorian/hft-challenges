@@ -40,3 +40,19 @@ time_limit_seconds: 60
 memory_limit_mb: 512
 daily_submission_limit: 100
 published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+  - key: monotonic
+    name: Best Monotonic
+    benchmark: BM_Monotonic
+    unit: cycles/op
+    order: asc
+  - key: cancel_heavy
+    name: Best Under Cancels
+    benchmark: BM_CancelHeavy
+    unit: cycles/op
+    order: asc
