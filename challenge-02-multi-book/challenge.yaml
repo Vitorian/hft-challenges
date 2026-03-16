@@ -149,6 +149,19 @@ description: |
 
   ### Getting Started
 
+  First, pull the latest challenge templates into your repo:
+
+  ```bash
+  # One-time: add the upstream remote
+  git remote add upstream https://github.com/Vitorian/hft-challenges.git
+
+  # Pull new challenges
+  git pull upstream main
+  git push origin main
+  ```
+
+  Then build and run locally:
+
   ```bash
   cd challenge-02-multi-book
   cmake -B build -DCMAKE_BUILD_TYPE=Release
