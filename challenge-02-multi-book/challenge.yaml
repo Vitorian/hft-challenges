@@ -1,0 +1,167 @@
+title: "Challenge 02: Multi-Symbol Order Book"
+slug: multi-book
+description: |
+  Build a **multi-symbol order book** with queue position tracking, venue interaction,
+  and per-operation latency measurement. The primary metric is **P99 latency** —
+  consistency matters more than raw average speed.
+
+  ### Features
+
+  - **200 symbols** with hot/cold traffic distribution (50 symbols generate 90% of traffic)
+  - **Venue interaction** — send/modify/cancel our orders through a venue, track exchange IDs
+  - **Queue position** — track FIFO position and qty ahead for our orders
+  - **Modify semantics** — qty-down keeps queue position, price change or qty-up loses it
+  - **Level queries** — best bid/ask with qty+count, top N levels, volume near best
+  - **P99 latency scored** — every operation is individually timed
+  - **Single-threaded** — all operations run on one thread, no concurrency needed
+
+  📄 [Download Exchange Specification (PDF)](/static/docs/challenge-02-exchange.pdf)
+
+  ---
+
+  ## Exchange Specification
+
+  The exchange operates a **central limit order book (CLOB)** for 200 symbols.
+  All operations are **single-threaded** — there is no concurrency.
+
+  ### Symbols
+
+  - 200 symbols numbered `0` to `199`
+  - 50 "hot" symbols (`0`–`49`) generate ~90% of message traffic
+  - The remaining 150 "cold" symbols generate ~10%
+  - Prices cluster near each symbol's mid-price (80% within 100 ticks)
+
+  ### Order Types
+
+  All orders are **limit orders** with a price and quantity. There are no market
+  orders, stop orders, or iceberg orders. Sides: `0` = bid (buy), `1` = ask (sell).
+
+  ### Our Orders vs Exchange Orders
+
+  Your `MultiOrderBook` must track two categories:
+
+  **Exchange feed orders** arrive via `add_order()`, `modify_order()`, and
+  `cancel_order()`. These include everyone's orders — both other participants
+  and ours (once the exchange confirms them).
+
+  **Our orders** are initiated via `send_order()`, `modify_our_order()`, and
+  `cancel_our_order()`. These go through the `Venue` interface and appear in
+  the feed after a short delay.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+  class MultiOrderBook {
+  public:
+      explicit MultiOrderBook(Venue& venue);
+
+      // Our orders — forward to venue
+      void send_order(uint64_t our_id, uint16_t symbol, int side,
+                      int64_t price, int64_t qty);
+      void modify_our_order(uint64_t our_id, int64_t new_price, int64_t new_qty);
+      void cancel_our_order(uint64_t our_id);
+
+      // Exchange feed — all orders (including ours when they arrive)
+      void add_order(uint64_t exchange_id, uint16_t symbol, int side,
+                     int64_t price, int64_t qty);
+      void modify_order(uint64_t exchange_id, int64_t new_qty);  // qty-down only
+      void cancel_order(uint64_t exchange_id);
+
+      // Queries
+      TopLevel best_bid(uint16_t symbol) const;
+      TopLevel best_ask(uint16_t symbol) const;
+      int get_top_levels(uint16_t symbol, int side, int n, TopLevel* out) const;
+      int64_t volume_near_best(uint16_t symbol, int side, int64_t depth) const;
+      QueuePosition get_queue_position(uint64_t our_id) const;
+  };
+  }
+  ```
+
+  ### Venue Round-Trip
+
+  When you call `venue.send_order(our_id, symbol, side, price, qty)`:
+  1. The venue returns an `exchange_id` immediately
+  2. Your order does **NOT** enter the book at this point
+  3. After a short delay (3–10 operations), the feed delivers
+     `add_order(exchange_id, symbol, side, price, qty)`
+  4. Only then should the order appear in your book
+
+  You must remember the mapping from `our_id` → `exchange_id` to recognize
+  your order when it arrives in the feed.
+
+  ### Modify Semantics
+
+  When you call `venue.modify_order(exchange_id, new_price, new_qty)`:
+
+  **Quantity decrease (same price):**
+  - Returns the **same** `exchange_id`
+  - Order **keeps** its queue position
+  - Feed delivers: `modify_order(exchange_id, new_qty)`
+
+  **Price change or quantity increase:**
+  - Returns a **new** `exchange_id`
+  - Order **loses** its queue position
+  - Feed delivers: `cancel_order(old_id)` then `add_order(new_id, ...)`
+
+  ### Queue Position (FIFO)
+
+  Orders at the same price level are filled in FIFO order.
+
+  `get_queue_position(our_id)` returns `{index, qty_ahead}`:
+  - `index` = number of orders ahead at the same price level (0 = front)
+  - `qty_ahead` = total quantity of all orders ahead
+  - Returns `{-1, 0}` if the order is unknown or not yet in the book
+
+  ### Level Queries
+
+  **`best_bid(symbol)` / `best_ask(symbol)`** — returns `TopLevel{price, qty, count}`.
+  Price is the best (highest bid / lowest ask), or `0` if empty.
+
+  **`get_top_levels(symbol, side, n, out)`** — writes up to `n` levels into `out[]`,
+  best-to-worst. Returns count written.
+
+  **`volume_near_best(symbol, side, depth)`** — total qty within `depth` ticks of best.
+
+  ### Workload
+
+  The benchmark prefills **500,000 orders** across all 200 symbols before timing.
+  During the timed phase:
+
+  | Operation | % |
+  |-----------|---|
+  | add_order | 35 |
+  | cancel_order | 20 |
+  | modify_order (qty-down) | 10 |
+  | best_bid / best_ask | 10 |
+  | send_order (ours) | 5 |
+  | get_top_levels | 5 |
+  | volume_near_best | 5 |
+  | get_queue_position | 5 |
+  | modify_our_order | 3 |
+  | cancel_our_order | 2 |
+
+  ### Scoring
+
+  **P99 latency** (cycles per operation) — every operation is individually timed.
+  Solutions with allocation spikes, hash resizes, or tree rebalancing will be
+  penalized even if their average is fast.
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-02-multi-book
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 120
+memory_limit_mb: 1024
+daily_submission_limit: 100
+published: true
+goals:
+  - key: p99
+    name: Lowest P99
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
