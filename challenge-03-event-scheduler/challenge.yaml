@@ -110,3 +110,18 @@ goals:
     benchmark: BM_Solution
     unit: cycles/op
     order: asc
+  - key: cancel_heavy
+    name: Cancel Heavy
+    benchmark: BM_CancelHeavy
+    unit: cycles/op
+    order: asc
+  - key: wide_horizon
+    name: Wide Horizon
+    benchmark: BM_WideHorizon
+    unit: cycles/op
+    order: asc
+  - key: cascade
+    name: Cascade
+    benchmark: BM_Cascade
+    unit: cycles/op
+    order: asc
