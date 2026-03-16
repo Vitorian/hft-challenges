@@ -1,0 +1,112 @@
+title: "Challenge 03: Event Scheduler"
+slug: event-scheduler
+description: |
+  Build a **high-performance event scheduler** that can handle millions of pending
+  events with varying time horizons. Events are scheduled at absolute microsecond
+  timestamps and fired when time is advanced past them.
+
+  The key metric is **P99 latency** — your scheduler must not have expensive
+  worst-case operations that would disrupt a real-time system. A naive
+  `std::priority_queue` gives O(log n) per operation with terrible cache behavior
+  at scale. Can you do better?
+
+  ### Features
+
+  - **500K prefilled events** with mixed near/mid/far time horizons
+  - **Schedule/cancel/advance** operations during the timed phase
+  - **Monotonic time advancement** — advance() is always called with increasing time
+  - **No ordering requirement within 1 microsecond** — events at the same µs may fire in any order
+  - **P99 latency scored** — every operation is individually timed
+  - **Single-threaded** — no concurrency needed
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+
+  using EventCallback = void(*)(uint64_t event_id, int64_t scheduled_time, void* user_data);
+
+  class EventScheduler {
+  public:
+      EventScheduler();
+      ~EventScheduler();
+
+      // Schedule a one-shot event at time_us (microseconds).
+      // If event_id already exists, replace it (implicit cancel + reschedule).
+      void schedule(uint64_t event_id, int64_t time_us);
+
+      // Cancel a pending event. Returns true if found.
+      bool cancel(uint64_t event_id);
+
+      // Advance clock to new_time_us. Fire all events with time <= new_time_us.
+      // Time always advances monotonically. Events at same µs fire in any order.
+      // Returns number of events fired.
+      uint32_t advance(int64_t new_time_us, EventCallback cb, void* user_data);
+
+      // Number of pending events.
+      uint64_t size() const;
+
+      // Time of next event, or INT64_MAX if empty.
+      int64_t next_event_time() const;
+  };
+  }
+  ```
+
+  ### Time Distribution
+
+  Events are scheduled across a wide range of time horizons:
+  - **50%** within 1ms (near-term, hot)
+  - **30%** within 100ms (medium)
+  - **20%** within 60 seconds (far future)
+
+  Your data structure must handle all three efficiently — both insertion and
+  retrieval. Solutions that are fast for near-term events but degrade on far
+  events (or vice versa) will be penalized at P99.
+
+  ### Operation Mix
+
+  | Operation | % |
+  |-----------|---|
+  | schedule | 35 |
+  | cancel | 20 |
+  | advance | 20 |
+  | size query | 15 |
+  | next_event_time | 10 |
+
+  ### Scoring
+
+  **P99 latency** (cycles per operation) — every operation is individually timed.
+  The `advance()` call fires all due events, so a single advance can trigger
+  thousands of callbacks. Solutions that batch-fire efficiently will dominate.
+
+  ### Getting Started
+
+  First, pull the latest challenge templates into your repo:
+
+  ```bash
+  # One-time: add the upstream remote
+  git remote add upstream https://github.com/Vitorian/hft-challenges.git
+
+  # Pull new challenges
+  git pull upstream main
+  git push origin main
+  ```
+
+  Then build and run locally:
+
+  ```bash
+  cd challenge-03-event-scheduler
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 120
+memory_limit_mb: 1024
+daily_submission_limit: 100
+published: true
+goals:
+  - key: p99
+    name: Lowest P99
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
