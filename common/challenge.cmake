@@ -9,6 +9,7 @@ target_include_directories(benchmark PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_CURRENT_SOURCE_DIR}/solution
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
 )
 
 # Boost (header-only — intrusive containers, flat_map, etc.)

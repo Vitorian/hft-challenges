@@ -3,4 +3,8 @@ project(challenge-03-event-scheduler LANGUAGES CXX)
 
 add_executable(benchmark benchmark.cpp solution/solution.cpp)
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/../common/challenge.cmake)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../common/challenge.cmake)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../common/challenge.cmake)
+elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/common/challenge.cmake)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/common/challenge.cmake)
+endif()
