@@ -24,3 +24,16 @@ if(absl_FOUND)
         absl::flat_hash_map absl::node_hash_map
         absl::btree absl::hash absl::strings)
 endif()
+
+# TBB (scalable allocator, cache_aligned_allocator)
+find_package(TBB QUIET)
+if(TBB_FOUND)
+    target_link_libraries(benchmark TBB::tbb)
+endif()
+
+# Allow solutions to specify additional link libraries via solution/libraries.cmake
+# Example solution/libraries.cmake:
+#   target_link_libraries(benchmark jemalloc)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/solution/libraries.cmake)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/solution/libraries.cmake)
+endif()
