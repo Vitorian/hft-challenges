@@ -57,3 +57,7 @@ goals:
     benchmark: BM_MissHeavy
     unit: cycles/op
     order: asc
+badges:
+  gold: 30
+  silver: 80
+  bronze: 200

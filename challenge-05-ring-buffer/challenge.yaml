@@ -72,3 +72,7 @@ goals:
     benchmark: BM_SmallBuffer
     unit: cycles/op
     order: asc
+badges:
+  gold: 100
+  silver: 500
+  bronze: 10000

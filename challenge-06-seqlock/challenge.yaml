@@ -66,3 +66,7 @@ goals:
     benchmark: BM_ReadHeavy
     unit: cycles/op
     order: asc
+badges:
+  gold: 10
+  silver: 30
+  bronze: 100

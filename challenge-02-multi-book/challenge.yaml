@@ -178,3 +178,7 @@ goals:
     benchmark: BM_Solution
     unit: cycles/op
     order: asc
+badges:
+  gold: 80
+  silver: 200
+  bronze: 1000

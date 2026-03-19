@@ -56,3 +56,7 @@ goals:
     benchmark: BM_CancelHeavy
     unit: cycles/op
     order: asc
+badges:
+  gold: 40
+  silver: 100
+  bronze: 500
