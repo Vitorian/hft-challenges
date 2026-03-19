@@ -1,0 +1,74 @@
+title: "Challenge 08: Ticker Lookup"
+slug: ticker-lookup
+description: |
+  Build the fastest possible **ticker symbol lookup table**.
+
+  You are given the complete set of ~7,000 real NASDAQ ticker symbols (max 6 characters) and their associated `uint32_t` index values in a single `build()` call. After that, **no keys are ever added or removed** — only lookups.
+
+  The `build()` call is **not timed**. You can spend as long as you want constructing a perfect hash, building a trie, sorting, or any other preprocessing. Only `find()` is benchmarked.
+
+  - **build** — receive all key-value pairs at once. Called exactly once after construction.
+  - **find** — look up a ticker symbol. Returns pointer to value, or `nullptr` if not found.
+
+  Your implementation goes in `solution/solution.h` and `solution/solution.cpp`.
+  The benchmark measures **CPU cycles per lookup** only.
+
+  A file `tickers.txt` is included with the full list of NASDAQ symbols used in the benchmark.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+
+  struct TickerEntry {
+      const char* symbol;    // null-terminated, max 6 chars
+      size_t symbol_len;
+      uint32_t value;
+  };
+
+  class TickerLookup {
+  public:
+      TickerLookup();
+
+      // Receive all entries at once. Called exactly once. NOT timed.
+      void build(const TickerEntry* entries, size_t count);
+
+      // Look up a symbol. Returns pointer to value, or nullptr if not found.
+      const uint32_t* find(const char* symbol, size_t symbol_len) const;
+  };
+
+  }
+  ```
+
+  - Symbols are uppercase ASCII letters only (A-Z), 1-6 characters
+  - `build()` is called exactly once; `find()` is called millions of times
+  - Both hits and misses are tested
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-08-ticker-lookup
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 60
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Fastest Lookup
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+  - key: hit_only
+    name: Best Hit Rate
+    benchmark: BM_HitOnly
+    unit: cycles/op
+    order: asc
+  - key: miss_heavy
+    name: Best Under Misses
+    benchmark: BM_MissHeavy
+    unit: cycles/op
+    order: asc

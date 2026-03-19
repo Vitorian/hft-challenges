@@ -1,0 +1,59 @@
+title: "Challenge 07: String Map"
+slug: string-map
+description: |
+  Build a high-performance **hash map** with string keys (up to 16 characters) and `uint32_t` values.
+
+  This is a general-purpose associative container. Keys are inserted one at a time, then looked up by key. Both insert and lookup are timed.
+
+  - **insert** — associate a string key with a uint32_t value. Keys are unique (no duplicates).
+  - **find** — look up a key and return a pointer to its value, or `nullptr` if not found.
+
+  Your implementation goes in `solution/solution.h` and `solution/solution.cpp`.
+  The benchmark measures **CPU cycles per operation** across mixed insert/lookup workloads.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+  class StringMap {
+  public:
+      StringMap();
+      void insert(const char* key, size_t key_len, uint32_t value);
+      const uint32_t* find(const char* key, size_t key_len) const;
+  };
+  }
+  ```
+
+  - Keys are null-terminated C strings, but `key_len` is always provided
+  - Maximum key length is 16 characters (not counting null terminator)
+  - Keys are unique — `insert` is never called twice with the same key
+  - `find` returns `nullptr` if the key is not in the map
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-07-string-map
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 60
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+  - key: lookup
+    name: Best Lookup
+    benchmark: BM_LookupOnly
+    unit: cycles/op
+    order: asc
+  - key: miss
+    name: Best Miss
+    benchmark: BM_MissHeavy
+    unit: cycles/op
+    order: asc
