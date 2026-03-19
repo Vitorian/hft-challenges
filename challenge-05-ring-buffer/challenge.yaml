@@ -1,0 +1,59 @@
+title: "Challenge 05: Ring Buffer"
+slug: ring-buffer
+description: |
+  Build a high-performance **SPSC (Single-Producer Single-Consumer) ring buffer** for passing `int64_t` values between two threads.
+
+  The producer calls `push()` from one thread, the consumer calls `pop()` from another. Your implementation must be thread-safe without using mutexes — this is a lock-free exercise.
+
+  - **push** — append a value to the back. Returns `true` if successful, `false` if full.
+  - **pop** — remove and return the front value. Returns `true` if successful, `false` if empty.
+  - **size** — return the number of elements currently in the buffer.
+
+  Your implementation goes in `solution/solution.h` and `solution/solution.cpp`.
+  The benchmark measures **CPU cycles per push+pop pair** with producer and consumer pinned to separate isolated CPU cores.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+  class RingBuffer {
+  public:
+      explicit RingBuffer(size_t capacity);
+      bool push(int64_t value);
+      bool pop(int64_t& out);
+      size_t size() const;
+  };
+  }
+  ```
+
+  - Capacity is always a power of 2 (you may rely on this)
+  - Must be thread-safe for one producer + one consumer (no mutexes)
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-05-ring-buffer
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 60
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Lowest Latency
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+  - key: burst
+    name: Best Burst
+    benchmark: BM_Burst
+    unit: cycles/op
+    order: asc
+  - key: small_buffer
+    name: Best Small Buffer
+    benchmark: BM_SmallBuffer
+    unit: cycles/op
+    order: asc

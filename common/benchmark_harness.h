@@ -16,8 +16,69 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
+#include <fstream>
+#include <sstream>
+#include <pthread.h>
+#include <sched.h>
 
 namespace hftu {
+
+// ---------------------------------------------------------------------------
+// CPU affinity — auto-detect isolated cores from /sys/devices/system/cpu/isolated
+// ---------------------------------------------------------------------------
+
+// Parse a CPU list like "2-3,6-7" into a vector of CPU IDs.
+inline std::vector<int> parse_cpu_list(const std::string& s) {
+    std::vector<int> cpus;
+    std::istringstream ss(s);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        auto dash = token.find('-');
+        if (dash != std::string::npos) {
+            int lo = std::stoi(token.substr(0, dash));
+            int hi = std::stoi(token.substr(dash + 1));
+            for (int i = lo; i <= hi; ++i) cpus.push_back(i);
+        } else if (!token.empty()) {
+            cpus.push_back(std::stoi(token));
+        }
+    }
+    return cpus;
+}
+
+// Return the list of isolated CPUs (from kernel isolcpus= parameter).
+// Returns empty vector if none are isolated.
+inline const std::vector<int>& isolated_cpus() {
+    static std::vector<int> cpus = [] {
+        std::ifstream f("/sys/devices/system/cpu/isolated");
+        if (!f.is_open()) return std::vector<int>{};
+        std::string line;
+        std::getline(f, line);
+        // Trim whitespace
+        while (!line.empty() && (line.back() == '\n' || line.back() == '\r' || line.back() == ' '))
+            line.pop_back();
+        if (line.empty()) return std::vector<int>{};
+        return parse_cpu_list(line);
+    }();
+    return cpus;
+}
+
+// Pin the calling thread to a specific CPU core.
+// Returns true on success.
+inline bool pin_thread(int cpu) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpu, &cpuset);
+    return pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset) == 0;
+}
+
+// Pin the calling thread to the Nth isolated CPU (0-indexed).
+// If no isolated CPUs are detected, does nothing and returns -1.
+// Returns the actual CPU ID pinned to, or -1 if not pinned.
+inline int pin_to_isolated(int index) {
+    auto& iso = isolated_cpus();
+    if (index >= static_cast<int>(iso.size())) return -1;
+    return pin_thread(iso[index]) ? iso[index] : -1;
+}
 
 // ---------------------------------------------------------------------------
 // TSC cycle measurement

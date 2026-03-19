@@ -1,0 +1,68 @@
+title: "Challenge 06: Seqlock"
+slug: seqlock
+description: |
+  Build a high-performance **sequence lock** (seqlock) that allows one writer and multiple readers to share data without blocking.
+
+  A seqlock protects a payload of type `Payload` (a plain struct). The writer updates the payload atomically from the reader's perspective. Readers retry if they detect a concurrent write.
+
+  - **write** — update the protected payload
+  - **read** — read the payload, retrying if a write was in progress
+
+  Your implementation goes in `solution/solution.h` and `solution/solution.cpp`.
+  The benchmark measures **CPU cycles per read or write operation**.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+
+  struct Payload {
+      int64_t a;
+      int64_t b;
+      int64_t c;
+      int64_t d;
+  };
+
+  class Seqlock {
+  public:
+      Seqlock();
+      void write(const Payload& data);
+      Payload read() const;
+  };
+
+  }
+  ```
+
+  **Correctness requirements:**
+  - A `read()` must never return a torn value (partial write)
+  - `read()` must return the most recently completed `write()`
+  - No mutexes or locks — this is a lock-free exercise
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-06-seqlock
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 60
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+  - key: write_heavy
+    name: Best Write-Heavy
+    benchmark: BM_WriteHeavy
+    unit: cycles/op
+    order: asc
+  - key: read_heavy
+    name: Best Read-Heavy
+    benchmark: BM_ReadHeavy
+    unit: cycles/op
+    order: asc
