@@ -12,7 +12,6 @@
 
 namespace {
 
-// LFENCE + RDTSC: ordered but lightweight (~20 cycles vs ~100 for CPUID)
 inline uint64_t rdtsc_fenced() {
     uint32_t lo, hi;
     asm volatile(
@@ -33,13 +32,13 @@ uint64_t run_latency(size_t capacity, size_t total_ops) {
     std::thread consumer([&]() {
         hftu::pin_to_isolated(1);
         consumer_ready.store(true, std::memory_order_release);
-        int64_t val;
+        hftu::Message msg{};
         size_t count = 0;
         uint64_t sum = 0;
         while (count < total_ops) {
-            if (rb.pop(val)) {
+            if (rb.pop(msg)) {
                 uint64_t now = rdtsc_fenced();
-                sum += now - static_cast<uint64_t>(val);
+                sum += now - msg.timestamp;
                 ++count;
             }
         }
@@ -50,9 +49,16 @@ uint64_t run_latency(size_t capacity, size_t total_ops) {
 
     std::thread producer([&]() {
         hftu::pin_to_isolated(0);
+        hftu::Message msg{};
         for (size_t i = 0; i < total_ops; ++i) {
-            auto ts = static_cast<int64_t>(rdtsc_fenced());
-            while (!rb.push(ts)) {}
+            msg.timestamp = rdtsc_fenced();
+            msg.sequence = i;
+            msg.symbol_id = static_cast<uint32_t>(i & 0xFFF);
+            msg.side = static_cast<uint16_t>(i & 1);
+            msg.price = static_cast<int64_t>(i * 100 + 1);
+            msg.quantity = static_cast<int64_t>((i & 0xFF) + 1);
+            msg.order_id = static_cast<int64_t>(i);
+            while (!rb.push(msg)) {}
         }
     });
 

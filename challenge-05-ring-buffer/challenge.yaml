@@ -1,16 +1,31 @@
 title: "Challenge 05: Ring Buffer"
 slug: ring-buffer
 description: |
-  Build a high-performance **SPSC (Single-Producer Single-Consumer) ring buffer** for passing `int64_t` values between two threads.
+  Build a high-performance **SPSC (Single-Producer Single-Consumer) ring buffer** for passing market data messages between two threads.
 
   The producer calls `push()` from one thread, the consumer calls `pop()` from another. Your implementation must be thread-safe without using mutexes — this is a lock-free exercise.
 
-  - **push** — append a value to the back. Returns `true` if successful, `false` if full.
-  - **pop** — remove and return the front value. Returns `true` if successful, `false` if empty.
+  Each message is a 48-byte struct representing a market data update:
+
+  ```cpp
+  struct Message {
+      uint64_t timestamp;   // 8
+      uint32_t symbol_id;   // 4
+      uint16_t side;        // 2
+      uint16_t flags;       // 2
+      int64_t  price;       // 8
+      int64_t  quantity;    // 8
+      int64_t  order_id;   // 8
+      uint64_t sequence;    // 8
+  };                        // 48 bytes
+  ```
+
+  - **push** — enqueue a message. Returns `true` if successful, `false` if full.
+  - **pop** — dequeue a message into `out`. Returns `true` if successful, `false` if empty.
   - **size** — return the number of elements currently in the buffer.
 
   Your implementation goes in `solution/solution.h` and `solution/solution.cpp`.
-  The benchmark measures **CPU cycles per push+pop pair** with producer and consumer pinned to separate isolated CPU cores.
+  The benchmark measures **push-to-pop latency** (cycles from producer timestamp to consumer receive) with producer and consumer pinned to separate isolated CPU cores.
 
   ### API
 
@@ -19,8 +34,8 @@ description: |
   class RingBuffer {
   public:
       explicit RingBuffer(size_t capacity);
-      bool push(int64_t value);
-      bool pop(int64_t& out);
+      bool push(const Message& msg);
+      bool pop(Message& out);
       size_t size() const;
   };
   }

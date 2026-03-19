@@ -8,16 +8,16 @@ namespace hftu {
 RingBuffer::RingBuffer(size_t capacity)
     : buf_(capacity), capacity_(capacity) {}
 
-bool RingBuffer::push(int64_t value) {
+bool RingBuffer::push(const Message& msg) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (count_ == capacity_) return false;
-    buf_[tail_] = value;
+    buf_[tail_] = msg;
     tail_ = (tail_ + 1) % capacity_;
     ++count_;
     return true;
 }
 
-bool RingBuffer::pop(int64_t& out) {
+bool RingBuffer::pop(Message& out) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (count_ == 0) return false;
     out = buf_[head_];
