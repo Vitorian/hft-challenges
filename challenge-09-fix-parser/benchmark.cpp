@@ -43,7 +43,7 @@ std::string random_text(std::mt19937_64& gen, int len) {
 std::string fix_checksum(const std::string& body) {
     int sum = 0;
     for (unsigned char c : body) sum += c;
-    char buf[4];
+    char buf[8];
     std::snprintf(buf, sizeof(buf), "%03d", sum & 0xFF);
     return buf;
 }
@@ -128,7 +128,7 @@ std::string generate_fix_message(std::mt19937_64& gen, int seq_num, bool bad_che
     if (bad_checksum) {
         // Corrupt the checksum
         int bad_val = (std::stoi(cs) + 1) % 256;
-        char buf[4];
+        char buf[8];
         std::snprintf(buf, sizeof(buf), "%03d", bad_val);
         cs = buf;
     }
