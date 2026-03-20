@@ -1,0 +1,98 @@
+title: "Challenge 10: FIX Builder"
+slug: fix-builder
+description: |
+  Build a high-performance **FIX message encoder** for order entry.
+
+  In `build()`, you receive a template message as a list of tag-value pairs representing a typical NewOrderSingle. This is NOT timed — precompute everything you can.
+
+  In `encode()`, you receive the fields that change per order (timestamp, sequence number, price, quantity, side, order ID) and must produce a complete, valid FIX 4.4 message ready for TCP. The returned `std::string_view` must remain valid until the next `encode()` call.
+
+  The benchmark verifies:
+  - Correct FIX structure (`8=FIX.4.4\x01 9=<len>\x01 ... 10=<checksum>\x01`)
+  - Correct BodyLength (tag 9)
+  - Correct CheckSum (tag 10)
+  - All variable fields updated correctly
+  - All template fields preserved
+
+  The key optimization opportunity: pre-serialize everything that doesn't change, and only patch the variable fields + recompute body length and checksum on each call. Integer-to-string conversion is on the hot path.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+
+  struct OrderFields {
+      int64_t  timestamp;    // tag 52: nanoseconds from epoch → "YYYYMMDD-HH:MM:SS.nnnnnnnnn"
+      uint64_t seq_num;      // tag 34
+      uint64_t cl_ord_id;    // tag 11
+      int64_t  price;        // tag 44: fixed-point * 10^8 → e.g. "187.5000"
+      int64_t  quantity;     // tag 38
+      int8_t   side;         // tag 54: 1=Buy, 2=Sell
+  };
+
+  class FixBuilder {
+  public:
+      FixBuilder();
+
+      // Receive template as tag-value pairs. NOT timed.
+      void build(std::span<const std::pair<int, std::string>> fields);
+
+      // Produce a valid FIX message with the given order fields.
+      // The returned string_view must be valid until the next encode() call.
+      std::string_view encode(const OrderFields& order);
+  };
+
+  }
+  ```
+
+  ### Template Fields (provided in build())
+
+  The template contains all the static fields for a typical order:
+  - `8` BeginString (FIX.4.4)
+  - `35` MsgType (D)
+  - `49` SenderCompID
+  - `56` TargetCompID
+  - `1` Account
+  - `21` HandlInst
+  - `55` Symbol
+  - `40` OrdType
+  - `59` TimeInForce
+  - `15` Currency
+  - `207` SecurityExchange
+  - `47` OrderCapacity
+  - And other static fields
+
+  Tags 9 (BodyLength), 10 (CheckSum), 34, 52, 11, 44, 38, and 54 are NOT in the template — you must insert them from `OrderFields` and compute 9/10.
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-10-fix-builder
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 120
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: BM_Solution
+    unit: cycles/msg
+    order: asc
+  - key: varying_price
+    name: Best Varying Price
+    benchmark: BM_VaryingPrice
+    unit: cycles/msg
+    order: asc
+  - key: burst
+    name: Best Burst
+    benchmark: BM_Burst
+    unit: cycles/msg
+    order: asc
+badges:
+  gold: 100
+  silver: 300
+  bronze: 1000
