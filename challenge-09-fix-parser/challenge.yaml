@@ -44,11 +44,15 @@ description: |
   public:
       FixParser();
       void build(std::span<const TickerEntry> entries);
-      size_t parse_batch(std::string_view data, std::span<ParsedOrder> out);
+      void parse_batch(std::string_view data, std::vector<ParsedOrder>& out);
   };
 
   }
   ```
+
+  - `build()` is called once with the symbol mapping. NOT timed.
+  - `parse_batch()` receives concatenated FIX messages and appends parsed orders to `out`.
+  - `out.capacity()` is guaranteed large enough for all messages — no reallocation needed.
 
   ### FIX Message Format
 
