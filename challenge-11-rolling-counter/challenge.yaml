@@ -1,0 +1,88 @@
+title: "Challenge 11: Rolling Counter"
+slug: rolling-counter
+description: |
+  Build a high-performance **rolling window event counter**.
+
+  In HFT systems, you need to track message rates in real time — for example, enforcing a max of 300 messages per second to avoid exchange throttling. This challenge measures how fast you can maintain a sliding window count.
+
+  The constructor takes a window `interval` and a `precision`, both in nanoseconds. The precision means you don't need exact per-nanosecond accuracy — events can be counted within ± precision. This allows bucket-based approximations.
+
+  - **update(time)** — advance the clock to the given timestamp (monotonically increasing)
+  - **addEvent(count)** — add `count` events at the current time
+  - **count()** — return the total number of events within the rolling window
+  - **operator size_t()** — same as count()
+
+  The benchmark calls update/addEvent/count in tight loops simulating real trading activity.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+
+  class RollingCounter {
+  public:
+      // interval_ns: window size in nanoseconds
+      // precision_ns: acceptable counting error window in nanoseconds
+      RollingCounter(int64_t interval_ns, int64_t precision_ns);
+
+      // Advance clock to time_ns. Guaranteed monotonically increasing.
+      void update(int64_t time_ns);
+
+      // Add count events at the current time.
+      void addEvent(size_t count);
+
+      // Return total events in the rolling window.
+      size_t count() const;
+      operator size_t() const;
+  };
+
+  }
+  ```
+
+  ### Example
+
+  ```
+  RollingCounter rc(1'000'000'000, 1'000'000);  // 1 second window, 1ms precision
+
+  rc.update(100'000'000);   // t=100ms
+  rc.addEvent(5);
+  rc.update(600'000'000);   // t=600ms
+  rc.addEvent(3);
+  rc.count();               // → 8 (both events within 1s window)
+
+  rc.update(1'200'000'000); // t=1200ms
+  rc.count();               // → 3 (first event expired, ±1ms precision)
+  ```
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-11-rolling-counter
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 60
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+  - key: high_rate
+    name: Best High Rate
+    benchmark: BM_HighRate
+    unit: cycles/op
+    order: asc
+  - key: sparse
+    name: Best Sparse
+    benchmark: BM_Sparse
+    unit: cycles/op
+    order: asc
+badges:
+  gold: 15
+  silver: 40
+  bronze: 100
