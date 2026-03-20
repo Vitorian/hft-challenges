@@ -1,5 +1,5 @@
 #pragma once
-// Challenge 10: FIX Builder
+// Challenge 10: FIX Encoder
 // Edit this file and solution.cpp to implement your solution.
 //
 // build() gives you a template message. encode() must produce a valid FIX message

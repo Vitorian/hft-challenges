@@ -1,4 +1,4 @@
-// Challenge 10: FIX Builder — Skeleton Implementation
+// Challenge 10: FIX Encoder — Skeleton Implementation
 // This is a correct but slow reference. You can do MUCH better!
 // The key insight: pre-serialize everything in build(), then only patch
 // the variable fields and recompute BodyLength + CheckSum in encode().

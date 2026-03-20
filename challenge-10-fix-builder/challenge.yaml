@@ -1,5 +1,5 @@
-title: "Challenge 10: FIX Builder"
-slug: fix-builder
+title: "Challenge 10: FIX Encoder"
+slug: fix-encoder
 description: |
   Build a high-performance **FIX message encoder** for order entry.
 
