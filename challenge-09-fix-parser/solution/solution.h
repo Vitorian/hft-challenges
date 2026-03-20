@@ -20,6 +20,7 @@ struct ParsedOrder {
     char     msg_type;    // 'D', '8', 'F', 'G'
     int8_t   side;        // 1=Buy, 2=Sell
     uint32_t symbol_id;   // from build() mapping
+    int64_t  timestamp;   // tag 52: nanoseconds from epoch
     int64_t  price;       // price * 100000000 (8 decimal places)
     int64_t  quantity;
     bool     valid;       // false if checksum failed

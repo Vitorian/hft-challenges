@@ -11,6 +11,7 @@ description: |
 
   **Fields to extract:**
   - Tag 35 (MsgType) → `char`
+  - Tag 52 (SendingTime) → `int64_t` nanoseconds from epoch (parse `YYYYMMDD-HH:MM:SS.nnn`)
   - Tag 55 (Symbol) → look up in your mapping → `uint32_t symbol_id`
   - Tag 44 (Price) → fixed-point `int64_t` (price × 10^8)
   - Tag 38 (OrderQty) → `int64_t`
@@ -35,6 +36,7 @@ description: |
       char     msg_type;    // 'D', '8', 'F', 'G'
       int8_t   side;        // 1=Buy, 2=Sell
       uint32_t symbol_id;   // from build() mapping
+      int64_t  timestamp;   // tag 52: nanoseconds from epoch
       int64_t  price;       // price * 100000000 (8 decimal places)
       int64_t  quantity;
       bool     valid;       // false if checksum failed

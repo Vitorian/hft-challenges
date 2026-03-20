@@ -47,6 +47,48 @@ static int64_t parse_int(std::string_view s) {
     return val;
 }
 
+// Parse FIX timestamp "YYYYMMDD-HH:MM:SS.nnnnnnnnn" to nanoseconds from epoch
+static int64_t parse_timestamp(std::string_view s) {
+    // Minimal parsing: extract components
+    // Format: 20260320-14:30:00.123456789
+    if (s.size() < 17) return 0;
+
+    int year = 0, month = 0, day = 0, hour = 0, min = 0, sec = 0;
+    int64_t nanos = 0;
+
+    // YYYYMMDD
+    for (int i = 0; i < 4; ++i) year = year * 10 + (s[i] - '0');
+    for (int i = 4; i < 6; ++i) month = month * 10 + (s[i] - '0');
+    for (int i = 6; i < 8; ++i) day = day * 10 + (s[i] - '0');
+    // HH:MM:SS
+    hour = (s[9] - '0') * 10 + (s[10] - '0');
+    min = (s[12] - '0') * 10 + (s[13] - '0');
+    sec = (s[15] - '0') * 10 + (s[16] - '0');
+
+    // Fractional seconds (variable length)
+    if (s.size() > 17 && s[17] == '.') {
+        int frac_digits = 0;
+        for (size_t i = 18; i < s.size() && s[i] >= '0' && s[i] <= '9'; ++i) {
+            nanos = nanos * 10 + (s[i] - '0');
+            ++frac_digits;
+        }
+        // Scale to nanoseconds (9 digits)
+        for (int i = frac_digits; i < 9; ++i) nanos *= 10;
+    }
+
+    // Convert to days since epoch (simplified, no leap second handling)
+    // Using a basic algorithm for days since 1970-01-01
+    auto days_since_epoch = [](int y, int m, int d) -> int64_t {
+        if (m <= 2) { y--; m += 12; }
+        int64_t days = 365LL * y + y / 4 - y / 100 + y / 400 + (153 * (m - 3) + 2) / 5 + d - 719469;
+        return days;
+    };
+
+    int64_t total_secs = days_since_epoch(year, month, day) * 86400LL +
+                         hour * 3600LL + min * 60LL + sec;
+    return total_secs * 1'000'000'000LL + nanos;
+}
+
 static int compute_checksum(const char* data, size_t len) {
     int sum = 0;
     for (size_t i = 0; i < len; ++i) {
@@ -104,6 +146,7 @@ void FixParser::parse_batch(std::string_view data, std::vector<ParsedOrder>& out
                     if (it != symbol_map_.end()) order.symbol_id = it->second;
                     break;
                 }
+                case 52: order.timestamp = parse_timestamp(value); break;
                 case 44: order.price = parse_price(value); break;
                 case 38: order.quantity = parse_int(value); break;
                 default: break;
