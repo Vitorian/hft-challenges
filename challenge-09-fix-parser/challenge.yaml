@@ -1,0 +1,100 @@
+title: "Challenge 09: FIX Parser"
+slug: fix-parser
+description: |
+  Build a high-performance **FIX protocol parser** for order messages.
+
+  FIX (Financial Information eXchange) is the standard protocol for electronic trading. Messages are tag=value pairs separated by SOH (`\x01`). Your parser must handle real-world-sized messages with many fields, but only extract the ones that matter.
+
+  You receive a symbol-to-ID mapping via `build()` (not timed), then parse batches of concatenated FIX messages as fast as possible.
+
+  **Message types:** NewOrderSingle (`D`), ExecutionReport (`8`), OrderCancelRequest (`F`), OrderCancelReplaceRequest (`G`)
+
+  **Fields to extract:**
+  - Tag 35 (MsgType) → `char`
+  - Tag 55 (Symbol) → look up in your mapping → `uint32_t symbol_id`
+  - Tag 44 (Price) → fixed-point `int64_t` (price × 10^8)
+  - Tag 38 (OrderQty) → `int64_t`
+  - Tag 54 (Side) → `int8_t` (1=Buy, 2=Sell)
+  - Tag 10 (CheckSum) → validate; set `valid=false` if bad
+
+  ~5% of messages have intentionally bad checksums. You must detect and flag them but still advance past them.
+
+  Messages follow the FIX 4.4 standard with realistic filler fields (Account, SenderCompID, TargetCompID, SendingTime, TransactTime, Currency, Text, etc.). No repeating groups.
+
+  ### API
+
+  ```cpp
+  namespace hftu {
+
+  struct TickerEntry {
+      std::string_view symbol;
+      uint32_t value;
+  };
+
+  struct ParsedOrder {
+      char     msg_type;    // 'D', '8', 'F', 'G'
+      int8_t   side;        // 1=Buy, 2=Sell
+      uint32_t symbol_id;   // from build() mapping
+      int64_t  price;       // price * 100000000 (8 decimal places)
+      int64_t  quantity;
+      bool     valid;       // false if checksum failed
+  };
+
+  class FixParser {
+  public:
+      FixParser();
+      void build(std::span<const TickerEntry> entries);
+      size_t parse_batch(std::string_view data, std::span<ParsedOrder> out);
+  };
+
+  }
+  ```
+
+  ### FIX Message Format
+
+  ```
+  8=FIX.4.4\x019=186\x0135=D\x0149=SENDER01\x0156=TARGET01\x01
+  34=12345\x0152=20260320-14:30:00.123\x0111=ORD-00001\x0155=AAPL\x01
+  54=1\x0144=187.50\x0138=100\x0140=2\x0159=0\x0160=20260320-14:30:00.100\x01
+  1=ACCT001\x0121=1\x0147=A\x0115=USD\x0110=123\x01
+  ```
+
+  - Fields separated by SOH (`\x01`)
+  - Tag 8 (BeginString) is always first
+  - Tag 9 (BodyLength) is always second
+  - Tag 10 (CheckSum) is always last
+  - CheckSum = sum of all bytes from tag 8 to end of tag before 10, mod 256, zero-padded to 3 digits
+  - Assume well-formed structure (no missing delimiters)
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-09-fix-parser
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+time_limit_seconds: 120
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: BM_Solution
+    unit: cycles/KB
+    order: asc
+  - key: large_batch
+    name: Best Large Batch
+    benchmark: BM_LargeBatch
+    unit: cycles/KB
+    order: asc
+  - key: checksum
+    name: Best With Checksums
+    benchmark: BM_ChecksumHeavy
+    unit: cycles/KB
+    order: asc
+badges:
+  gold: 200
+  silver: 500
+  bronze: 2000

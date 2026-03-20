@@ -1,9 +1,9 @@
 # common/challenge.cmake — shared build config for all challenges
 # Include this after add_executable(benchmark ...) in each challenge's CMakeLists.txt
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -march=native")
+
+target_compile_features(benchmark PRIVATE cxx_std_20)
 
 target_include_directories(benchmark PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
