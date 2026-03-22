@@ -94,28 +94,43 @@ std::pair<int,int> ImpliedBook::on_update(const BookUpdate& update,
 
     // Apply update to outright book
     int& sz = book_sizes_[leg][side];
-    int pos = update.position;
+    int64_t price = update.level.price;
 
     switch (update.action) {
-        case 0: // add
-            if (sz < MAX_DEPTH && pos <= sz) {
-                for (int i = sz; i > pos; i--)
-                    books_[leg][side][i] = books_[leg][side][i - 1];
-                books_[leg][side][pos] = update.level;
-                sz++;
+        case 0: { // add — insert at sorted position
+            if (sz >= MAX_DEPTH) break;
+            int pos = 0;
+            if (side == 0) { // bid: descending
+                while (pos < sz && books_[leg][side][pos].price > price) pos++;
+            } else { // ask: ascending
+                while (pos < sz && books_[leg][side][pos].price < price) pos++;
+            }
+            for (int i = sz; i > pos; i--)
+                books_[leg][side][i] = books_[leg][side][i - 1];
+            books_[leg][side][pos] = update.level;
+            sz++;
+            break;
+        }
+        case 1: { // modify — find by price
+            for (int i = 0; i < sz; i++) {
+                if (books_[leg][side][i].price == price) {
+                    books_[leg][side][i].quantity = update.level.quantity;
+                    break;
+                }
             }
             break;
-        case 1: // modify
-            if (pos < sz)
-                books_[leg][side][pos] = update.level;
-            break;
-        case 2: // delete
-            if (pos < sz) {
-                for (int i = pos; i < sz - 1; i++)
-                    books_[leg][side][i] = books_[leg][side][i + 1];
-                sz--;
+        }
+        case 2: { // delete — find by price and remove
+            for (int i = 0; i < sz; i++) {
+                if (books_[leg][side][i].price == price) {
+                    for (int j = i; j < sz - 1; j++)
+                        books_[leg][side][j] = books_[leg][side][j + 1];
+                    sz--;
+                    break;
+                }
             }
             break;
+        }
     }
 
     // Recompute implied book via sweep

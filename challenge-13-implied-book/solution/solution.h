@@ -18,8 +18,7 @@ struct BookUpdate {
     uint16_t leg_index;   // which outright book changed
     int8_t   side;        // 0=bid, 1=ask
     uint8_t  action;      // 0=add, 1=modify, 2=delete
-    uint8_t  position;    // level index (0=best)
-    Level    level;
+    Level    level;        // price + quantity (position derived from price)
 };
 
 class ImpliedBook {

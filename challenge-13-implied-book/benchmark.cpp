@@ -21,38 +21,36 @@ UpdateStream generate_updates(std::span<const int> weights, int depth,
 
     int num_legs = weights.size();
 
-    // Track current book state for realistic updates
     struct BookState {
-        int sizes[2] = {0, 0};  // bid, ask
+        int sizes[2] = {0, 0};
         int64_t prices[2][10] = {};
         int64_t qtys[2][10] = {};
     };
     std::vector<BookState> state(num_legs);
 
-    // Initialize each leg with some levels
     std::uniform_int_distribution<int> leg_dist(0, num_legs - 1);
     std::uniform_int_distribution<int> side_dist(0, 1);
-    std::uniform_int_distribution<int64_t> price_dist(9000, 11000);
     std::uniform_int_distribution<int64_t> qty_dist(1, 500);
     std::uniform_real_distribution<double> action_prob(0.0, 1.0);
 
-    // Seed each leg with 5 levels per side
+    // Seed each leg with `depth` levels per side
     for (int leg = 0; leg < num_legs; leg++) {
         int64_t bid_base = 10000 - leg * 100;
         int64_t ask_base = 10050 - leg * 100;
         for (int i = 0; i < depth; i++) {
-            // Bid side (descending)
-            state[leg].prices[0][i] = bid_base - i * 10;
-            state[leg].qtys[0][i] = qty_dist(rng);
+            int64_t bp = bid_base - i * 10;
+            int64_t bq = qty_dist(rng);
+            state[leg].prices[0][i] = bp;
+            state[leg].qtys[0][i] = bq;
             state[leg].sizes[0]++;
-            us.updates.push_back({(uint16_t)leg, 0, 0, (uint8_t)i,
-                                  {state[leg].prices[0][i], state[leg].qtys[0][i]}});
-            // Ask side (ascending)
-            state[leg].prices[1][i] = ask_base + i * 10;
-            state[leg].qtys[1][i] = qty_dist(rng);
+            us.updates.push_back({(uint16_t)leg, 0, 0, {bp, bq}});
+
+            int64_t ap = ask_base + i * 10;
+            int64_t aq = qty_dist(rng);
+            state[leg].prices[1][i] = ap;
+            state[leg].qtys[1][i] = aq;
             state[leg].sizes[1]++;
-            us.updates.push_back({(uint16_t)leg, 1, 0, (uint8_t)i,
-                                  {state[leg].prices[1][i], state[leg].qtys[1][i]}});
+            us.updates.push_back({(uint16_t)leg, 1, 0, {ap, aq}});
         }
     }
 
@@ -70,32 +68,25 @@ UpdateStream generate_updates(std::span<const int> weights, int depth,
         if (sz == 0 || p < 0.4) {
             // Add a level
             if (sz < depth) {
-                int pos = std::uniform_int_distribution<int>(0, sz)(rng);
+                // Generate a new price that doesn't exist yet
                 int64_t price;
-                if (side == 0)  // bid
-                    price = (pos == 0) ? state[leg].prices[0][0] + 10 :
-                            state[leg].prices[0][pos - 1] - 10;
-                else  // ask
-                    price = (pos == 0) ? state[leg].prices[1][0] - 10 :
-                            state[leg].prices[1][pos - 1] + 10;
+                if (side == 0) // bid: pick a price below worst bid
+                    price = state[leg].prices[0][sz - 1] - 10;
+                else // ask: pick a price above worst ask
+                    price = state[leg].prices[1][sz - 1] + 10;
 
                 upd.action = 0;
-                upd.position = pos;
                 upd.level = {price, qty_dist(rng)};
 
-                // Update state
-                for (int i = sz; i > pos; i--) {
-                    state[leg].prices[side][i] = state[leg].prices[side][i-1];
-                    state[leg].qtys[side][i] = state[leg].qtys[side][i-1];
-                }
+                // Insert sorted into state
+                int pos = sz; // append at end (worst level)
                 state[leg].prices[side][pos] = price;
                 state[leg].qtys[side][pos] = upd.level.quantity;
                 state[leg].sizes[side]++;
             } else {
-                // Modify instead
+                // Book full, modify instead
                 int pos = std::uniform_int_distribution<int>(0, sz - 1)(rng);
                 upd.action = 1;
-                upd.position = pos;
                 upd.level = {state[leg].prices[side][pos], qty_dist(rng)};
                 state[leg].qtys[side][pos] = upd.level.quantity;
             }
@@ -104,7 +95,6 @@ UpdateStream generate_updates(std::span<const int> weights, int depth,
             if (sz > 0) {
                 int pos = std::uniform_int_distribution<int>(0, sz - 1)(rng);
                 upd.action = 1;
-                upd.position = pos;
                 upd.level = {state[leg].prices[side][pos], qty_dist(rng)};
                 state[leg].qtys[side][pos] = upd.level.quantity;
             } else continue;
@@ -113,7 +103,6 @@ UpdateStream generate_updates(std::span<const int> weights, int depth,
             if (sz > 1) {
                 int pos = std::uniform_int_distribution<int>(0, sz - 1)(rng);
                 upd.action = 2;
-                upd.position = pos;
                 upd.level = {state[leg].prices[side][pos], state[leg].qtys[side][pos]};
 
                 for (int i = pos; i < sz - 1; i++) {
