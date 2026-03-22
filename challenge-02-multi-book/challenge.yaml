@@ -170,7 +170,7 @@ description: |
   ```
 time_limit_seconds: 120
 memory_limit_mb: 1024
-daily_submission_limit: 100
+daily_submission_limit: 5
 published: true
 goals:
   - key: p99

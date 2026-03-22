@@ -39,7 +39,7 @@ description: |
   ```
 time_limit_seconds: 60
 memory_limit_mb: 512
-daily_submission_limit: 100
+daily_submission_limit: 5
 published: true
 goals:
   - key: fastest
