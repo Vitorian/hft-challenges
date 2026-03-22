@@ -31,8 +31,8 @@ description_md: |
   ```
   June (Leg 0):              July (Leg 1):
   Bid        Ask             Bid        Ask
-  50 @ 100   30 @ 101        40 @ 200   25 @ 201
-  80 @ 99    60 @ 102        70 @ 199   50 @ 202
+  50 @ 100   30 @ 103        40 @ 200   25 @ 204
+  80 @ 99    60 @ 104        70 @ 199   50 @ 205
   ```
 
   **Implied bid** (buy the spread = buy June ask, sell July bid):
@@ -40,25 +40,25 @@ description_md: |
   - Compute like aggressing the book — consume quantity as you sweep through levels.
 
   ```
-  Step 1: Best June ask (30 @ 101) vs best July bid (40 @ 200)
-    Price = 101 - 200 = -99, Qty = min(30, 40) = 30
-    Remaining: June ask exhausted → next is 60 @ 102. July bid has 10 left @ 200.
+  Step 1: Best June ask (30 @ 103) vs best July bid (40 @ 200)
+    Price = 103 - 200 = -97, Qty = min(30, 40) = 30
+    Remaining: June ask exhausted → next is 60 @ 104. July bid has 10 left @ 200.
 
-  Step 2: Best June ask (60 @ 102) vs best July bid (10 @ 200)
-    Price = 102 - 200 = -98, Qty = min(60, 10) = 10
-    Remaining: June ask has 50 left @ 102. July bid exhausted → next is 70 @ 199.
+  Step 2: Best June ask (60 @ 104) vs best July bid (10 @ 200)
+    Price = 104 - 200 = -96, Qty = min(60, 10) = 10
+    Remaining: June ask has 50 left @ 104. July bid exhausted → next is 70 @ 199.
 
-  Step 3: Best June ask (50 @ 102) vs best July bid (70 @ 199)
-    Price = 102 - 199 = -97, Qty = min(50, 70) = 50
+  Step 3: Best June ask (50 @ 104) vs best July bid (70 @ 199)
+    Price = 104 - 199 = -95, Qty = min(50, 70) = 50
     Remaining: June ask exhausted. Stop.
   ```
 
   Result — implied bids (best first):
 
   ```
-  30 @ -99
-  10 @ -98
-  50 @ -97
+  30 @ -97
+  10 @ -96
+  50 @ -95
   ```
 
   **Implied ask** (sell the spread = sell June bid, buy July ask):
@@ -66,26 +66,30 @@ description_md: |
   - Price = (+1 × June_bid) + (-1 × July_ask) = June_bid - July_ask
 
   ```
-  Step 1: Best June bid (50 @ 100) vs best July ask (25 @ 201)
-    Price = 100 - 201 = -101, Qty = min(50, 25) = 25
-    Remaining: June bid has 25 left @ 100. July ask exhausted → next is 50 @ 202.
+  Step 1: Best June bid (50 @ 100) vs best July ask (25 @ 204)
+    Price = 100 - 204 = -104, Qty = min(50, 25) = 25
+    Remaining: June bid has 25 left @ 100. July ask exhausted → next is 50 @ 205.
 
-  Step 2: Best June bid (25 @ 100) vs best July ask (50 @ 202)
-    Price = 100 - 202 = -102, Qty = min(25, 50) = 25
-    Remaining: June bid exhausted → next is 80 @ 99. July ask has 25 left @ 202.
+  Step 2: Best June bid (25 @ 100) vs best July ask (50 @ 205)
+    Price = 100 - 205 = -105, Qty = min(25, 50) = 25
+    Remaining: June bid exhausted → next is 80 @ 99. July ask has 25 left @ 205.
 
-  Step 3: Best June bid (80 @ 99) vs best July ask (25 @ 202)
-    Price = 99 - 202 = -103, Qty = min(80, 25) = 25
+  Step 3: Best June bid (80 @ 99) vs best July ask (25 @ 205)
+    Price = 99 - 205 = -106, Qty = min(80, 25) = 25
     Remaining: June bid has 55 left @ 99. July ask exhausted. Stop.
   ```
 
   Result — implied asks (best first):
 
   ```
-  25 @ -101
-  25 @ -102
-  25 @ -103
+  25 @ -104
+  25 @ -105
+  25 @ -106
   ```
+
+  The implied spread market is -97 / -104 (7 ticks wide).
+  This is the bid-ask spread of the synthetic — wider than either outright because
+  you pay both outright spreads when constructing the synthetic.
 
   Now imagine this recomputation happening on every single book update, thousands
   of times per second. With 3 legs and 5 levels, that produces up to 3×5 = 15
