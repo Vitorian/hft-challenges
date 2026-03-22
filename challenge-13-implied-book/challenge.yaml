@@ -1,0 +1,105 @@
+title: "Challenge 13: Implied Book"
+slug: "implied-book"
+directory_name: "challenge-13-implied-book"
+description_md: |
+  ## Implied Order Book
+
+  Futures exchanges trade calendar spreads (Jun-Jul), butterflies (Jun-2×Jul+Aug),
+  and strips (Apr+May+Jun). The implied order book for a synthetic instrument is
+  computed from the outright books of its legs.
+
+  ### The Problem
+
+  You manage outright L2 order books (5 levels per side) for each leg of a synthetic.
+  When any leg's book changes, you must recompute the top 5 implied bid and ask levels.
+
+  For a synthetic defined by weights `[w₁, w₂, ..., wₙ]`:
+  - **Implied bid price** = Σ(wᵢ × leg_priceᵢ), choosing ask levels for legs you buy (w>0)
+    and bid levels for legs you sell (w<0)
+  - **Implied quantity** = min(leg_qtyᵢ / |wᵢ|) across all legs
+  - **Implied ask** = the inverse: bid levels for w>0, ask levels for w<0
+
+  The naive approach enumerates all D^N level combinations (5³ = 125 for 3 legs).
+  Incremental approaches that only recompute affected combinations can be much faster.
+
+  ### Interface
+
+  ```cpp
+  struct Level {
+      int64_t price;
+      int64_t quantity;
+  };
+
+  struct BookUpdate {
+      uint16_t leg_index;   // which leg changed
+      int8_t   side;        // 0=bid, 1=ask
+      uint8_t  action;      // 0=add, 1=modify, 2=delete
+      uint8_t  position;    // level index (0=best)
+      Level    level;
+  };
+
+  class ImpliedBook {
+  public:
+      // Define synthetic: weights per leg, output depth. NOT timed.
+      void build(std::span<const int> weights, int depth);
+
+      // Apply outright book update, return top implied levels.
+      // out_bids/out_asks pre-allocated with `depth` capacity.
+      std::pair<int,int> on_update(const BookUpdate& update,
+                                   Level* out_bids, Level* out_asks);
+  };
+  ```
+
+  ### Rules
+
+  - `build()` is called once before each benchmark run. Use it to pre-allocate.
+  - `on_update()` must apply the update to the outright book AND return the
+    current top implied levels for both sides.
+  - Output levels must be sorted: bids descending, asks ascending by price.
+  - Same-price levels from different combinations must be aggregated (quantities summed).
+  - `out_bids` and `out_asks` have capacity for `depth` levels.
+
+  ### Benchmarks
+
+  Three workloads:
+
+  - **butterfly_3leg**: Weights {+1, -2, +1}, 5 levels — classic butterfly
+  - **spread_2leg**: Weights {+1, -1}, 5 levels — calendar spread
+  - **strip_3leg**: Weights {+1, +1, +1}, 5 levels — strip
+
+  ### Metric
+
+  Cycles per update (p99). Lower is better.
+
+time_limit_seconds: 30
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+
+goals:
+  - name: "fastest"
+    display_name: "Fastest Overall"
+    description: "Average cycles/op across all workloads"
+    aggregation: "average"
+    benchmarks: ["butterfly_3leg", "spread_2leg", "strip_3leg"]
+    order: "asc"
+    unit: "cycles/op"
+  - name: "butterfly"
+    display_name: "Best Butterfly"
+    description: "Performance on 3-leg butterfly {+1,-2,+1}"
+    aggregation: "single"
+    benchmarks: ["butterfly_3leg"]
+    order: "asc"
+    unit: "cycles/op"
+  - name: "spread"
+    display_name: "Best Spread"
+    description: "Performance on 2-leg calendar spread"
+    aggregation: "single"
+    benchmarks: ["spread_2leg"]
+    order: "asc"
+    unit: "cycles/op"
+
+badges:
+  gold: 50
+  silver: 150
+  bronze: 500
