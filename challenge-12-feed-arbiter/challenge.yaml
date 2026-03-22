@@ -1,0 +1,104 @@
+title: "Challenge 12: Feed Arbiter"
+slug: "feed-arbiter"
+directory_name: "challenge-12-feed-arbiter"
+description_md: |
+  ## Feed Arbitration
+
+  Real exchanges send identical market data on two redundant UDP multicast feeds
+  (A and B) from separate data centers. Either feed can drop packets. Your job is
+  to produce a single deduplicated, in-order output stream.
+
+  ### The Problem
+
+  You receive 48-byte ITCH-like messages from two feeds. Each message has a
+  `sequence` number starting at 1. Both feeds carry the same data but either
+  can drop messages independently — sometimes in bursts of hundreds.
+
+  When a gap occurs on one feed, the other feed fills it. You must emit each
+  sequence number exactly once, in order. The challenge is how fast you can
+  recover when a burst of gaps is filled.
+
+  ### Interface
+
+  ```cpp
+  struct Message {
+      uint64_t sequence;
+      uint8_t  msg_type;
+      uint16_t symbol_id;
+      uint8_t  side;
+      int64_t  price;
+      int32_t  quantity;
+      uint64_t timestamp;
+      uint32_t order_id;
+      uint8_t  _pad[5];   // 48 bytes total
+  };
+
+  class FeedArbiter {
+  public:
+      FeedArbiter();
+
+      // Called once with max expected sequence. NOT timed.
+      void build(uint64_t max_sequence);
+
+      // Message arrived on one of the feeds.
+      // Write in-order deduplicated messages to out (pre-allocated).
+      // Returns number of messages written.
+      size_t on_message(const Message& msg, Message* out);
+  };
+  ```
+
+  ### Rules
+
+  - `build()` is called once before each benchmark run with the max sequence number.
+    Use it to pre-allocate. This call is **not timed**.
+  - `on_message()` is called for each arriving message (from either feed).
+  - Messages within each feed arrive in order, but the two feeds are interleaved.
+  - You must emit each sequence number exactly once, in ascending order.
+  - If a message fills a gap, you must flush all contiguous buffered messages.
+  - `out` buffer has enough capacity for worst case.
+  - The same sequence may arrive from both feeds — emit only the first.
+
+  ### Benchmarks
+
+  Three workloads with increasing gap sizes:
+
+  - **small_gaps**: 5% drop rate, bursts of 1–5
+  - **burst_gaps**: 5% drop rate, bursts of 1–50
+  - **large_gaps**: 5% drop rate, bursts of 1–500
+
+  ### Metric
+
+  Cycles per message (total input messages). Lower is better.
+
+time_limit_seconds: 30
+memory_limit_mb: 512
+daily_submission_limit: 100
+published: true
+
+goals:
+  - name: "fastest"
+    display_name: "Fastest Overall"
+    description: "Average cycles/op across all three workloads"
+    aggregation: "average"
+    benchmarks: ["small_gaps", "burst_gaps", "large_gaps"]
+    order: "asc"
+    unit: "cycles/op"
+  - name: "small_gaps"
+    display_name: "Best Small Gaps"
+    description: "Performance on small gap bursts (1-5)"
+    aggregation: "single"
+    benchmarks: ["small_gaps"]
+    order: "asc"
+    unit: "cycles/op"
+  - name: "large_gaps"
+    display_name: "Best Large Gaps"
+    description: "Performance on large gap bursts (1-500)"
+    aggregation: "single"
+    benchmarks: ["large_gaps"]
+    order: "asc"
+    unit: "cycles/op"
+
+badges:
+  gold: 15
+  silver: 40
+  bronze: 100
