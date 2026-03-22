@@ -61,7 +61,31 @@ description_md: |
   50 @ -97
   ```
 
-  **Implied ask** is the inverse: sell June (use June bids), buy July (use July asks).
+  **Implied ask** (sell the spread = sell June bid, buy July ask):
+  - To sell the spread, you SELL June (use June bids) and BUY July (use July asks).
+  - Price = (+1 × June_bid) + (-1 × July_ask) = June_bid - July_ask
+
+  ```
+  Step 1: Best June bid (50 @ 100) vs best July ask (25 @ 201)
+    Price = 100 - 201 = -101, Qty = min(50, 25) = 25
+    Remaining: June bid has 25 left @ 100. July ask exhausted → next is 50 @ 202.
+
+  Step 2: Best June bid (25 @ 100) vs best July ask (50 @ 202)
+    Price = 100 - 202 = -102, Qty = min(25, 50) = 25
+    Remaining: June bid exhausted → next is 80 @ 99. July ask has 25 left @ 202.
+
+  Step 3: Best June bid (80 @ 99) vs best July ask (25 @ 202)
+    Price = 99 - 202 = -103, Qty = min(80, 25) = 25
+    Remaining: June bid has 55 left @ 99. July ask exhausted. Stop.
+  ```
+
+  Result — implied asks (best first):
+
+  ```
+  25 @ -101
+  25 @ -102
+  25 @ -103
+  ```
 
   Now imagine this recomputation happening on every single book update, thousands
   of times per second. With 3 legs and 5 levels, that produces up to 3×5 = 15
