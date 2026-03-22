@@ -1,4 +1,4 @@
-title: "Challenge 01: Order Book"
+title: "Challenge 01: Best Price Tracker"
 slug: order-book
 description: |
   Build a high-performance **limit order book** that supports:
