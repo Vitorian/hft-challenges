@@ -22,9 +22,9 @@ int ImpliedBook::sweep(bool is_bid, Level* out) {
     for (int i = 0; i < num_legs_; i++) {
         int w = weights_[i];
         if (is_bid)
-            sides[i] = (w > 0) ? 1 : 0;  // buy -> ask, sell -> bid
+            sides[i] = (w > 0) ? 0 : 1;  // bid: sell legs w>0 (use bid), buy legs w<0 (use ask)
         else
-            sides[i] = (w > 0) ? 0 : 1;  // sell -> bid, buy -> ask
+            sides[i] = (w > 0) ? 1 : 0;  // ask: buy legs w>0 (use ask), sell legs w<0 (use bid)
     }
 
     // Check all legs have at least one level
