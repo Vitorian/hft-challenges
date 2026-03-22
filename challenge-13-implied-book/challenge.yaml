@@ -22,6 +22,45 @@ description_md: |
   The naive approach enumerates all D^N level combinations (5³ = 125 for 3 legs).
   Incremental approaches that only recompute affected combinations can be much faster.
 
+  ### Example: Calendar Spread (Jun - Jul)
+
+  Weights: `{+1, -1}` — buy June, sell July.
+
+  **Outright books:**
+
+  ```
+  June (Leg 0):              July (Leg 1):
+  Bid        Ask             Bid        Ask
+  100 @ 50   101 @ 30        200 @ 40   201 @ 25
+   99 @ 80   102 @ 60        199 @ 70   202 @ 50
+  ```
+
+  **Implied bid** (buy the spread = buy June ask, sell July bid):
+  - To buy the spread, you BUY June (use June asks) and SELL July (use July bids).
+  - Price = (+1 × June_ask) + (-1 × July_bid) = June_ask - July_bid
+  - Qty = min(June_ask_qty, July_bid_qty)
+
+  | June Ask | July Bid | Implied Price | Implied Qty |
+  |----------|----------|---------------|-------------|
+  | 101 @ 30 | 200 @ 40 | 101 - 200 = -99 | min(30, 40) = 30 |
+  | 101 @ 30 | 199 @ 70 | 101 - 199 = -98 | min(30, 70) = 30 |
+  | 102 @ 60 | 200 @ 40 | 102 - 200 = -98 | min(60, 40) = 40 |
+  | 102 @ 60 | 199 @ 70 | 102 - 199 = -97 | min(60, 70) = 60 |
+
+  Sorted descending (best bid first), aggregating same prices:
+
+  ```
+  Implied Bids:
+  -97 @ 60
+  -98 @ 70    ← two combos at -98: 30 + 40
+  -99 @ 30
+  ```
+
+  **Implied ask** is the inverse: sell June (use June bids), buy July (use July asks).
+
+  Now imagine this recomputation happening on every single book update, thousands
+  of times per second. With 3 legs and 5 levels, that's 125 combinations per update.
+
   ### Interface
 
   ```cpp
