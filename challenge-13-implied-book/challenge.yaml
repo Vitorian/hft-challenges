@@ -31,35 +31,41 @@ description_md: |
   ```
   June (Leg 0):              July (Leg 1):
   Bid        Ask             Bid        Ask
-  100 @ 50   101 @ 30        200 @ 40   201 @ 25
-   99 @ 80   102 @ 60        199 @ 70   202 @ 50
+  50 @ 100   30 @ 101        40 @ 200   25 @ 201
+  80 @ 99    60 @ 102        70 @ 199   50 @ 202
   ```
 
   **Implied bid** (buy the spread = buy June ask, sell July bid):
   - To buy the spread, you BUY June (use June asks) and SELL July (use July bids).
-  - Price = (+1 × June_ask) + (-1 × July_bid) = June_ask - July_bid
-  - Qty = min(June_ask_qty, July_bid_qty)
-
-  | June Ask | July Bid | Implied Price | Implied Qty |
-  |----------|----------|---------------|-------------|
-  | 101 @ 30 | 200 @ 40 | 101 - 200 = -99 | min(30, 40) = 30 |
-  | 101 @ 30 | 199 @ 70 | 101 - 199 = -98 | min(30, 70) = 30 |
-  | 102 @ 60 | 200 @ 40 | 102 - 200 = -98 | min(60, 40) = 40 |
-  | 102 @ 60 | 199 @ 70 | 102 - 199 = -97 | min(60, 70) = 60 |
-
-  Sorted descending (best bid first), aggregating same prices:
+  - Compute like aggressing the book — consume quantity as you sweep through levels.
 
   ```
-  Implied Bids:
-  -97 @ 60
-  -98 @ 70    ← two combos at -98: 30 + 40
-  -99 @ 30
+  Step 1: Best June ask (30 @ 101) vs best July bid (40 @ 200)
+    Price = 101 - 200 = -99, Qty = min(30, 40) = 30
+    Remaining: June ask exhausted → next is 60 @ 102. July bid has 10 left @ 200.
+
+  Step 2: Best June ask (60 @ 102) vs best July bid (10 @ 200)
+    Price = 102 - 200 = -98, Qty = min(60, 10) = 10
+    Remaining: June ask has 50 left @ 102. July bid exhausted → next is 70 @ 199.
+
+  Step 3: Best June ask (50 @ 102) vs best July bid (70 @ 199)
+    Price = 102 - 199 = -97, Qty = min(50, 70) = 50
+    Remaining: June ask exhausted. Stop.
+  ```
+
+  Result — implied bids (best first):
+
+  ```
+  30 @ -99
+  10 @ -98
+  50 @ -97
   ```
 
   **Implied ask** is the inverse: sell June (use June bids), buy July (use July asks).
 
   Now imagine this recomputation happening on every single book update, thousands
-  of times per second. With 3 legs and 5 levels, that's 125 combinations per update.
+  of times per second. With 3 legs and 5 levels, that produces up to 3×5 = 15
+  sweep steps per side per update.
 
   ### Interface
 
