@@ -3,9 +3,9 @@
 #include <cstddef>
 #include <span>
 #include <utility>
-#include <vector>
 #include <algorithm>
 #include <climits>
+#include <cstring>
 
 namespace hftu {
 
@@ -50,7 +50,7 @@ private:
     Level books_[MAX_LEGS][2][MAX_DEPTH] = {};
     int   book_sizes_[MAX_LEGS][2] = {};
 
-    void recompute(Level* out_bids, int& nbids, Level* out_asks, int& nasks);
+    int sweep(bool is_bid, Level* out);
 };
 
 } // namespace hftu

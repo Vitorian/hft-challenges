@@ -1,5 +1,4 @@
 #include "solution.h"
-#include <cstring>
 
 namespace hftu {
 
@@ -14,90 +13,76 @@ void ImpliedBook::build(std::span<const int> weights, int depth) {
     std::memset(book_sizes_, 0, sizeof(book_sizes_));
 }
 
-// Naive: full recomputation on every update.
-// For N legs with D levels each, generates D^N combinations.
-void ImpliedBook::recompute(Level* out_bids, int& nbids, Level* out_asks, int& nasks) {
-    // Temporary storage for all combinations
-    struct Combo { int64_t price; int64_t quantity; };
-    static thread_local std::vector<Combo> bid_combos, ask_combos;
-    bid_combos.clear();
-    ask_combos.clear();
+// Sweep through levels consuming quantity, like aggressing the book.
+// For implied bid: buy legs with w>0 (use ask side), sell legs with w<0 (use bid side).
+// For implied ask: sell legs with w>0 (use bid side), buy legs with w<0 (use ask side).
+int ImpliedBook::sweep(bool is_bid, Level* out) {
+    // Determine which side to read from for each leg
+    int sides[MAX_LEGS];
+    for (int i = 0; i < num_legs_; i++) {
+        int w = weights_[i];
+        if (is_bid)
+            sides[i] = (w > 0) ? 1 : 0;  // buy -> ask, sell -> bid
+        else
+            sides[i] = (w > 0) ? 0 : 1;  // sell -> bid, buy -> ask
+    }
 
-    // For implied BID: we want to BUY the synthetic.
-    // For leg with weight > 0: take from outright ASKS (we buy the leg)
-    // For leg with weight < 0: take from outright BIDS (we sell the leg)
-    // Implied price = sum(weight_i * leg_price_i)
-    // Implied qty = min(leg_qty_i / |weight_i|)
+    // Check all legs have at least one level
+    for (int i = 0; i < num_legs_; i++) {
+        if (book_sizes_[i][sides[i]] == 0)
+            return 0;
+    }
 
-    // Recursive enumeration of all level combinations
-    struct State { int64_t price; int64_t qty; };
+    // Working copy of quantities remaining at each level
+    int64_t remaining[MAX_LEGS][MAX_DEPTH];
+    int pos[MAX_LEGS];  // current level index per leg
 
-    auto enumerate = [&](bool is_bid, auto& combos) {
-        // Start with leg 0, enumerate all combinations
-        std::vector<State> current = {State{0, INT64_MAX}};
-        std::vector<State> next;
+    for (int i = 0; i < num_legs_; i++) {
+        pos[i] = 0;
+        int s = sides[i];
+        for (int j = 0; j < book_sizes_[i][s]; j++)
+            remaining[i][j] = books_[i][s][j].quantity;
+    }
 
-        for (int leg = 0; leg < num_legs_; leg++) {
-            next.clear();
-            int w = weights_[leg];
-            // For implied bid: positive weight -> buy -> use ask side
-            //                  negative weight -> sell -> use bid side
-            // For implied ask: positive weight -> sell -> use bid side
-            //                  negative weight -> buy -> use ask side
-            int side;
-            if (is_bid)
-                side = (w > 0) ? 1 : 0;  // ask if buying, bid if selling
-            else
-                side = (w > 0) ? 0 : 1;  // bid if selling, ask if buying
-
-            int nlevels = book_sizes_[leg][side];
-            if (nlevels == 0) {
-                current.clear();
+    int count = 0;
+    while (count < depth_) {
+        // Check all legs have remaining levels
+        bool valid = true;
+        for (int i = 0; i < num_legs_; i++) {
+            if (pos[i] >= book_sizes_[i][sides[i]]) {
+                valid = false;
                 break;
             }
+        }
+        if (!valid) break;
 
-            for (auto& st : current) {
-                for (int li = 0; li < nlevels; li++) {
-                    auto& lv = books_[leg][side][li];
-                    int64_t implied_price = st.price + w * lv.price;
-                    int64_t implied_qty = std::min(st.qty, lv.quantity / std::abs(w));
-                    if (implied_qty > 0)
-                        next.push_back(State{implied_price, implied_qty});
-                }
-            }
-            std::swap(current, next);
+        // Compute implied price at current positions
+        int64_t price = 0;
+        for (int i = 0; i < num_legs_; i++)
+            price += weights_[i] * books_[i][sides[i]][pos[i]].price;
+
+        // Find min available quantity (adjusted for weight)
+        int64_t min_qty = INT64_MAX;
+        for (int i = 0; i < num_legs_; i++) {
+            int64_t avail = remaining[i][pos[i]] / std::abs(weights_[i]);
+            if (avail < min_qty)
+                min_qty = avail;
         }
 
-        for (auto& st : current)
-            combos.push_back(Combo{st.price, st.qty});
-    };
+        if (min_qty <= 0) break;
 
-    enumerate(true, bid_combos);
-    enumerate(false, ask_combos);
+        // Emit this level
+        out[count++] = Level{price, min_qty};
 
-    // Sort bids descending by price, asks ascending
-    std::sort(bid_combos.begin(), bid_combos.end(),
-              [](auto& a, auto& b) { return a.price > b.price; });
-    std::sort(ask_combos.begin(), ask_combos.end(),
-              [](auto& a, auto& b) { return a.price < b.price; });
-
-    // Aggregate same-price levels and take top depth_
-    auto aggregate = [&](std::vector<Combo>& combos, Level* out, int& count) {
-        count = 0;
-        int64_t last_price = INT64_MIN;
-        for (auto& c : combos) {
-            if (count > 0 && c.price == last_price) {
-                out[count - 1].quantity += c.quantity;
-            } else {
-                if (count >= depth_) break;
-                out[count++] = Level{c.price, c.quantity};
-                last_price = c.price;
-            }
+        // Consume quantity from each leg
+        for (int i = 0; i < num_legs_; i++) {
+            remaining[i][pos[i]] -= min_qty * std::abs(weights_[i]);
+            if (remaining[i][pos[i]] <= 0)
+                pos[i]++;
         }
-    };
+    }
 
-    aggregate(bid_combos, out_bids, nbids);
-    aggregate(ask_combos, out_asks, nasks);
+    return count;
 }
 
 std::pair<int,int> ImpliedBook::on_update(const BookUpdate& update,
@@ -133,9 +118,9 @@ std::pair<int,int> ImpliedBook::on_update(const BookUpdate& update,
             break;
     }
 
-    // Full recomputation
-    int nbids = 0, nasks = 0;
-    recompute(out_bids, nbids, out_asks, nasks);
+    // Recompute implied book via sweep
+    int nbids = sweep(true, out_bids);
+    int nasks = sweep(false, out_asks);
     return {nbids, nasks};
 }
 
