@@ -93,6 +93,6 @@ goals:
     unit: cycles/msg
     order: asc
 badges:
-  gold: 100
-  silver: 300
-  bronze: 1000
+  gold: 400
+  silver: 700
+  bronze: 1200

@@ -83,6 +83,6 @@ goals:
     unit: cycles/op
     order: asc
 badges:
-  gold: 15
-  silver: 40
-  bronze: 100
+  gold: 30
+  silver: 60
+  bronze: 150

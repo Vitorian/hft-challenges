@@ -101,6 +101,6 @@ goals:
     unit: cycles/KB
     order: asc
 badges:
-  gold: 200
-  silver: 500
+  gold: 800
+  silver: 1200
   bronze: 2000

@@ -99,6 +99,6 @@ goals:
     unit: "cycles/op"
 
 badges:
-  gold: 10
-  silver: 25
-  bronze: 50
+  gold: 15
+  silver: 30
+  bronze: 60
