@@ -13,11 +13,7 @@ namespace hftu {
 
 // ---- Modify this struct freely ----
 // Add intrusive pointers, bucket indices, timestamps — whatever you need.
-// The benchmark only requires it is default-constructible and >= sizeof(void*).
-struct Event {
-    int64_t scheduled_time_ns = 0;
-    Event*  next = nullptr;
-};
+struct Event {};
 
 // ---- Skeleton: std::multimap (correct, O(log N) insert) ----
 template <typename Derived>
@@ -25,8 +21,9 @@ class EventScheduler {
 public:
     EventScheduler() = default;
 
+    Derived* me() { return static_cast<Derived*>(this); }
+
     void schedule(Event* event, int64_t time_ns) {
-        event->scheduled_time_ns = time_ns;
         map_.emplace(time_ns, event);
         ++size_;
     }
@@ -37,9 +34,10 @@ public:
             auto it = map_.begin();
             if (it->first > new_time_ns) break;
             Event* e = it->second;
+            int64_t t = it->first;
             map_.erase(it);
             --size_;
-            static_cast<Derived*>(this)->fire(e, e->scheduled_time_ns);
+            me()->fire(e, t);
             ++fired;
         }
         return fired;
