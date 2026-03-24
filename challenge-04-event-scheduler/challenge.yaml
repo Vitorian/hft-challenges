@@ -1,0 +1,97 @@
+title: "Challenge 04: Event Scheduler (No Cancel)"
+slug: "event-scheduler-no-cancel"
+directory_name: "challenge-04-event-scheduler"
+description_md: |
+  ## Event Scheduler — No Cancel
+
+  A variant of Challenge 03 focused purely on scheduling and firing events.
+  No cancellation, no reschedule — once an event is scheduled, it will fire.
+
+  ### Why this exists
+
+  Challenge 03 requires cancel support, which forces specific design tradeoffs
+  (version counters, doubly-linked lists, cancelable heaps). Many real-world
+  schedulers don't need cancel — timer callbacks, heartbeat managers, timeout
+  handlers. This challenge strips cancel away and lets you focus purely on
+  the fastest possible schedule-and-fire path.
+
+  The interface uses intrusive Event objects and CRTP for zero virtual dispatch
+  and zero allocation on the hot path.
+
+  ### Interface
+
+  ```cpp
+  // Modify this struct freely — add fields, change layout, whatever you need.
+  // The benchmark only requires it is default-constructible and at least sizeof(void*).
+  struct Event {
+      int64_t scheduled_time_ns = 0;
+      Event*  next = nullptr;
+  };
+
+  // CRTP base — your scheduler inherits from this.
+  // The benchmark provides a Derived class with a fire(Event*, int64_t) method.
+  template <typename Derived>
+  class EventScheduler {
+  public:
+      // Schedule an event at the given absolute time (nanoseconds).
+      // The event is guaranteed to not already be scheduled.
+      void schedule(Event* event, int64_t time_ns);
+
+      // Advance time. Fire all events with time <= new_time_ns.
+      // Time is always monotonically increasing.
+      // Fires via CRTP: static_cast<Derived*>(this)->fire(event, time_ns)
+      // Returns number of events fired.
+      uint32_t advance(int64_t new_time_ns);
+
+      // Number of pending (unfired) events.
+      uint64_t size() const;
+
+      // Time of the next event, or INT64_MAX if empty.
+      int64_t next_event_time() const;
+  };
+  ```
+
+  ### Rules
+
+  - You may completely redefine the `Event` struct. Add fields, remove fields,
+    change the layout. The benchmark only requires it is default-constructible
+    and at least `sizeof(void*)`.
+  - The scheduler is a CRTP template. The benchmark instantiates it with a
+    concrete class that has `void fire(Event*, int64_t)`.
+  - No cancel. Once scheduled, an event will fire when time advances past it.
+  - Each `Event*` is scheduled at most once at any given time.
+  - Time is in nanoseconds, always monotonically increasing.
+  - The caller owns Event lifetime — never free or allocate Event objects.
+
+  ### Benchmarks
+
+  Mixed workload: 500K prefilled events, 200K timed operations
+  (schedule, advance, size, next_event_time).
+
+  Time distribution:
+  - 50% within 1us (near-term)
+  - 30% within 100ms (medium)
+  - 20% within 60s (far future)
+
+  ### Metric
+
+  P99 latency in cycles per operation. Lower is better.
+
+time_limit_seconds: 30
+memory_limit_mb: 512
+daily_submission_limit: 10
+published: true
+
+goals:
+  - name: "p99"
+    display_name: "P99 Latency"
+    description: "99th percentile latency across all operations"
+    aggregation: "single"
+    benchmarks: ["BM_Solution"]
+    order: "asc"
+    unit: "cycles/op"
+
+badges:
+  gold: 100
+  silver: 500
+  bronze: 2000
