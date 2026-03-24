@@ -22,11 +22,8 @@ description_md: |
 
   ```cpp
   // Modify this struct freely — add fields, change layout, whatever you need.
-  // The benchmark only requires it is default-constructible and at least sizeof(void*).
-  struct Event {
-      int64_t scheduled_time_ns = 0;
-      Event*  next = nullptr;
-  };
+  // The benchmark only requires it is default-constructible.
+  struct Event {};
 
   // CRTP base — your scheduler inherits from this.
   // The benchmark provides a Derived class with a fire(Event*, int64_t) method.
