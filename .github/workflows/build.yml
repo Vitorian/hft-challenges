@@ -1,0 +1,52 @@
+name: Build All Challenges
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libtbb-dev libboost-dev libabsl-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake tbb boost abseil
+
+      - name: Build and test all challenges
+        run: |
+          failed=0
+          for dir in challenge-*/; do
+            name=$(basename "$dir")
+            echo "=== Building $name ==="
+            cd "$dir"
+            cmake -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -3
+            if cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) 2>&1; then
+              echo "  BUILD OK"
+            else
+              echo "  BUILD FAILED"
+              failed=$((failed + 1))
+            fi
+            cd ..
+            echo ""
+          done
+          if [ $failed -gt 0 ]; then
+            echo "FAILED: $failed challenges"
+            exit 1
+          fi
+          echo "All challenges built successfully"
