@@ -1,0 +1,8 @@
+[package]
+name = "hftu-bench"
+version = "0.1.0"
+edition = "2021"
+description = "HFT University benchmark harness for Rust challenges"
+
+# Zero external dependencies — runs offline in sandbox
+[dependencies]

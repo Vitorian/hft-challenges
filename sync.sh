@@ -30,7 +30,7 @@ git checkout "upstream/$UPSTREAM_BRANCH" -- common/
 for dir in challenge-*/; do
     if git cat-file -e "upstream/$UPSTREAM_BRANCH:$dir" 2>/dev/null; then
         echo "Syncing $dir (keeping your solution/)..."
-        git checkout "upstream/$UPSTREAM_BRANCH" -- "${dir}CMakeLists.txt" "${dir}benchmark.cpp" "${dir}challenge.yaml" "${dir}README.md" 2>/dev/null || true
+        git checkout "upstream/$UPSTREAM_BRANCH" -- "${dir}CMakeLists.txt" "${dir}benchmark.cpp" "${dir}README.md" 2>/dev/null || true
     fi
 done
 

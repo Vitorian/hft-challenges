@@ -1,0 +1,11 @@
+[package]
+name = "challenge-01-order-book-rust"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "benchmark"
+path = "src/main.rs"
+
+[dependencies]
+hftu-bench = { path = "../common/hftu-bench" }

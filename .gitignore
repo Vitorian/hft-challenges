@@ -1,1 +1,4 @@
 build/
+
+# Rust build artifacts
+**/target/
