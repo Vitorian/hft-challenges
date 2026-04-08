@@ -28,11 +28,15 @@ jobs:
         run: |
           brew install cmake tbb boost abseil
 
-      - name: Build and test all challenges
+      - name: Build C++ challenges
         run: |
           failed=0
           for dir in challenge-*/; do
             name=$(basename "$dir")
+            if [ ! -f "$dir/CMakeLists.txt" ]; then
+              echo "=== Skipping $name (Rust) ==="
+              continue
+            fi
             echo "=== Building $name ==="
             cd "$dir"
             cmake -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -3
@@ -49,4 +53,4 @@ jobs:
             echo "FAILED: $failed challenges"
             exit 1
           fi
-          echo "All challenges built successfully"
+          echo "All C++ challenges built successfully"
