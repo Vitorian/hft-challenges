@@ -3,7 +3,7 @@
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -march=native")
 
-target_compile_features(benchmark PRIVATE cxx_std_20)
+target_compile_features(benchmark PRIVATE cxx_std_23)
 
 target_include_directories(benchmark PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
