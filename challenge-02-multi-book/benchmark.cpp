@@ -29,6 +29,10 @@ class VenueImpl : public hftu::Venue {
 public:
     explicit VenueImpl(uint64_t start_eid) : next_eid_(start_eid) {}
 
+    void reset_next_eid(uint64_t eid) {
+        next_eid_ = eid;
+    }
+
     uint64_t peek_next_eid() const { return next_eid_; }
 
     uint64_t send_order(uint64_t /*our_id*/, uint16_t /*symbol*/, int /*side*/,
@@ -195,6 +199,8 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
     uint64_t next_eid = 1;
     uint64_t next_our_id = 1;
 
+    constexpr bool our_order = true;
+    constexpr bool not_our_order = false;
     // Track active exchange orders (for cancel/modify targets)
     struct ActiveOrder {
         uint64_t eid;
@@ -202,6 +208,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
         int8_t side;
         int64_t price;
         int64_t qty;
+        bool is_our;
     };
     std::vector<ActiveOrder> active;
     active.reserve(cfg.setup_orders + cfg.timed_ops);
@@ -214,6 +221,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
         int8_t side;
         int64_t price;
         int64_t qty;
+        size_t min_trigger_at{};
     };
     std::vector<OurOrder> our_active;
 
@@ -237,7 +245,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
         uint64_t eid = next_eid++;
 
         wl.setup.push_back({Operation::ADD, eid, sym, side, price, qty, 0});
-        active.push_back({eid, sym, side, price, qty});
+        active.push_back({eid, sym, side, price, qty, not_our_order});
     }
     wl.venue_start_eid = next_eid;
 
@@ -267,25 +275,44 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             int64_t qty = qty_dist(gen);
             uint64_t eid = next_eid++;
             wl.timed.push_back({Operation::ADD, eid, sym, side, price, qty, 0});
-            active.push_back({eid, sym, side, price, qty});
+            active.push_back({eid, sym, side, price, qty, not_our_order});
 
         } else if (r < 55 && active.size() > 1000) {
             // CANCEL (exchange feed) — 20%
             std::uniform_int_distribution<size_t> idx(0, active.size() - 1);
             size_t ci = idx(gen);
-            uint64_t eid = active[ci].eid;
-            active[ci] = active.back();
-            active.pop_back();
-            wl.timed.push_back({Operation::CANCEL, eid, 0, 0, 0, 0, 0});
+
+            for( auto j = 0U; j < active.size(); ++j ) {
+                auto& ao = active[(ci + j)%active.size()];
+                // Generate cancel events only for external orders
+                // if our order is happen to be randomly selected
+                // we will pick another one.
+                if( !ao.is_our ) {
+                    uint64_t eid = ao.eid;
+                    ao = active.back();
+                    active.pop_back();
+                    wl.timed.push_back({Operation::CANCEL, eid, 0, 0, 0, 0, 0});
+                    break;
+                }
+            }
 
         } else if (r < 65 && active.size() > 100) {
             // MODIFY (exchange feed, qty-down) — 10%
             std::uniform_int_distribution<size_t> idx(0, active.size() - 1);
             size_t mi = idx(gen);
-            auto& ao = active[mi];
-            int64_t new_qty = std::max(int64_t(1), ao.qty * std::uniform_int_distribution<int64_t>(30, 90)(gen) / 100);
-            ao.qty = new_qty;
-            wl.timed.push_back({Operation::MODIFY, ao.eid, 0, 0, 0, new_qty, 0});
+
+            for( auto j = 0U; j < active.size(); ++j ) {
+                auto& ao = active[(mi + j)%active.size()];
+                // Generate modify events only for external orders
+                // if our order is happen to be randomly selected
+                // we will pick another one.
+                if( !ao.is_our ) {
+                    int64_t new_qty = std::max(int64_t(1), ao.qty * std::uniform_int_distribution<int64_t>(30, 90)(gen) / 100);
+                    ao.qty = new_qty;
+                    wl.timed.push_back({Operation::MODIFY, ao.eid, 0, 0, 0, new_qty, 0});
+                    break;
+                }
+            }
 
         } else if (r < 70 && static_cast<int>(our_active.size()) < cfg.max_our_orders) {
             // SEND_OUR — 5%
@@ -300,11 +327,11 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
 
             // Schedule ADD in feed after latency
             int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
-            pending.push({op_idx + static_cast<size_t>(delay) + 1,
-                          {Operation::ADD, eid, sym, side, price, qty, 0}});
+            auto trigger_at = op_idx + static_cast<size_t>(delay) + 1;
+            pending.push({trigger_at, {Operation::ADD, eid, sym, side, price, qty, 0}});
 
-            our_active.push_back({oid, eid, sym, side, price, qty});
-            active.push_back({eid, sym, side, price, qty});
+            our_active.push_back({oid, eid, sym, side, price, qty, trigger_at + 1});
+            active.push_back({eid, sym, side, price, qty, our_order});
 
         } else if (r < 73 && !our_active.empty()) {
             // MODIFY_OUR — 3%
@@ -316,13 +343,15 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             if (std::uniform_int_distribution<int>(0, 99)(gen) < 60) {
                 // Qty-down: keeps position
                 int64_t new_qty = std::max(int64_t(1), oo.qty * std::uniform_int_distribution<int64_t>(30, 90)(gen) / 100);
-                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, oo.price, new_qty, 0});
+                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, oo.price, new_qty, oo.exchange_id});
 
                 // Feed: modify with same eid
                 int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
-                pending.push({op_idx + static_cast<size_t>(delay) + 1,
+                size_t trigger_at = std::max<size_t>( op_idx + static_cast<size_t>(delay) + 1, oo.min_trigger_at);
+                pending.push({trigger_at,
                               {Operation::MODIFY, oo.exchange_id, 0, 0, 0, new_qty, 0}});
                 oo.qty = new_qty;
+                oo.min_trigger_at = trigger_at + 1;
                 // Update active list qty
                 for (auto& a : active) {
                     if (a.eid == oo.exchange_id) { a.qty = new_qty; break; }
@@ -334,12 +363,14 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
                 uint64_t old_eid = oo.exchange_id;
                 uint64_t new_eid = next_eid++; // venue will assign this
 
-                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, new_price, new_qty, 0});
+                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, new_price, new_qty, new_eid});
 
                 int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
-                size_t when = op_idx + static_cast<size_t>(delay) + 1;
-                pending.push({when, {Operation::CANCEL, old_eid, 0, 0, 0, 0, 0}});
-                pending.push({when + 1, {Operation::ADD, new_eid, oo.symbol, oo.side, new_price, new_qty, 0}});
+                size_t trigger_at = std::max<size_t>( op_idx + static_cast<size_t>(delay) + 1, oo.min_trigger_at);
+
+                pending.push({trigger_at, {Operation::CANCEL, old_eid, 0, 0, 0, 0, 0}});
+                pending.push({trigger_at + 1, {Operation::ADD, new_eid, oo.symbol, oo.side, new_price, new_qty, 0}});
+                oo.min_trigger_at = trigger_at + 2;
 
                 // Update tracking
                 for (auto& a : active) {
@@ -358,7 +389,8 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             wl.timed.push_back({Operation::CANCEL_OUR, oo.our_id, 0, 0, 0, 0, 0});
 
             int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
-            pending.push({op_idx + static_cast<size_t>(delay) + 1,
+            size_t trigger_at = std::max<size_t>( op_idx + static_cast<size_t>(delay) + 1, oo.min_trigger_at);
+            pending.push({trigger_at,
                           {Operation::CANCEL, oo.exchange_id, 0, 0, 0, 0, 0}});
 
             // Remove from active lists
@@ -472,8 +504,10 @@ static hftu::RegisterBenchmark reg_solution(
             hftu::MultiOrderBook book(venue);
 
             // Setup (not timed)
-            for (const auto& op : wl.setup)
+            for (const auto& op : wl.setup) {
+                venue.reset_next_eid( op.aux );
                 execute_op(book, op);
+            }
 
             // Timed — per-operation measurement
             for (const auto& op : wl.timed) {
