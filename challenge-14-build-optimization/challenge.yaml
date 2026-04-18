@@ -1,0 +1,81 @@
+title: "Challenge 14: Build Optimization"
+slug: build-optimization
+track: cpp_latency
+description: |
+  This challenge is different. The code is frozen — you cannot modify it.
+  Your only lever is the **compiler flags**.
+
+  Edit the `// CXXFLAGS=` comment on the first line of `solution/solution.h`.
+  The build system reads this line and passes the flags to `g++`. The skeleton
+  starts with `-O2 -march=native`. Everything else — the loop, the types, the
+  benchmark — is locked in `benchmark.cpp`.
+
+  The benchmark processes 200,000 market data ticks per call. Each tick is a
+  16-byte struct with a trade price (`double`), quantity, side, and a flags
+  field where 0 marks the end of the burst. The score is reported in cycles
+  per 1000 ticks.
+
+  ### The Loop (in benchmark.cpp — read-only)
+
+  ```cpp
+  BurstResult process_burst(const MarketTick* t) {
+      double  total_notional = 0.0;
+      int64_t net_volume     = 0;
+
+      while (t->flags) {
+          total_notional += t->price;
+          int32_t mask = -static_cast<int32_t>(t->side);
+          net_volume += (t->quantity ^ mask) - mask;
+          ++t;
+      }
+
+      return {total_notional, net_volume};
+  }
+  ```
+
+  ### Allowed Flags
+
+  The build system whitelists `-O` levels, `-f` flags, `-m` architecture flags,
+  and `-std=` flags. Shell metacharacters, `-include`, `--sysroot`, and other
+  path-based flags are rejected.
+
+  ### Hints
+
+  - Start by understanding **why** the loop runs at the speed it does.
+  - Read the generated assembly (`g++ -S`). Count the dependency chains.
+  - The answer is not `-O3`.
+  - Think about what the compiler *could* do but *won't* — and why it won't.
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-14-build-optimization
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+
+  To test different flags:
+  ```bash
+  # Edit the first line of solution/solution.h, then:
+  cmake --build build --clean-first
+  ./build/benchmark
+  ```
+
+  > **Note:** The public benchmark uses a different seed than the certified
+  > benchmark on the server. Your local score may differ slightly.
+time_limit_seconds: 60
+memory_limit_mb: 2048
+daily_submission_limit: 10
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: burst_processing
+    unit: cycles/kop
+    order: asc
+badges:
+  gold: 2400
+  silver: 2700
+  bronze: 2900
+weight: 0.2
