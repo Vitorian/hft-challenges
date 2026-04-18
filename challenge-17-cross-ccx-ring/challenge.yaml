@@ -5,26 +5,40 @@ description: |
   Same interface as [Challenge 05](/challenge/ring-buffer) — but the producer
   and consumer now run on **different CCXes** with separate L3 caches.
 
+  ### Why This Matters
+
+  Everyone optimizes their SPSC queue for cores that share an L3 cache —
+  and it works beautifully. But what happens when two processes on
+  different CCXes need to talk? The same solution that scored 250 cycles
+  on shared-L3 cores suddenly scores **1,500+** across the Infinity Fabric.
+
+  This is not a contrived scenario. On any multi-CCX AMD chip (Ryzen 3000+,
+  EPYC) or multi-die Intel Xeon (Sapphire Rapids, Granite Rapids), core
+  pairs that share an L3 are the *minority*. Most core-to-core
+  communication crosses a fabric interconnect, and the latency penalty is
+  5-6× — showing up as unexplained P99 jitter that nobody traces back to
+  cache topology.
+
+  The key insight: **the optimal cross-CCX ring buffer is a fundamentally
+  different design from the optimal same-CCX ring buffer.** Taking your
+  Challenge 05 winner and running it here won't cut it. The bottleneck
+  shifts from computation to cache line transfer cost, and that demands
+  a different architecture.
+
   ### What is a CCX?
 
   AMD Ryzen and EPYC processors are built from **Core Complexes (CCXes)** —
   groups of 3-4 cores that share an L3 cache. Multiple CCXes are connected
   via the **Infinity Fabric (IF)**, an on-die interconnect. Intel uses a
-  similar topology on recent chips — Alder Lake and later split cores into
-  P-core and E-core clusters with separate cache domains, and multi-die
-  Xeons (Sapphire Rapids, Granite Rapids) use the **EMIB** interconnect
-  between tiles.
+  similar topology — multi-die Xeons use the **EMIB** interconnect between
+  tiles, and even consumer chips (Alder Lake+) split cores into clusters
+  with separate cache domains.
 
   In Challenge 05, both threads share the same L3. A cache line bounce
-  between cores costs ~10-15ns. In this challenge, every cache line that
-  crosses between CCXes travels through the Infinity Fabric at **~70-80ns
-  on Zen 2** (~40-50ns on Zen 4/5). Your Challenge 05 solution will work —
-  but it will be slow. How slow? Submit it and find out.
-
-  This is the reality of modern multi-core systems. In production HFT
-  systems, the producer (network thread) and consumer (strategy thread)
-  often land on different CCXes or even different NUMA nodes. Optimizing
-  for this topology is not optional.
+  costs ~10-15ns. Here, every cache line that crosses between CCXes travels
+  through the Infinity Fabric at **~70-80ns on Zen 2** (~40-50ns on
+  Zen 4/5). Your Challenge 05 solution will work — but it will be slow.
+  How slow? Submit it and find out.
 
   ### API
 
