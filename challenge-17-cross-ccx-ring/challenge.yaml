@@ -1,0 +1,84 @@
+title: "Challenge 17: Cross-CCX Ring Buffer"
+slug: cross-ccx-ring
+track: cpp_latency
+description: |
+  Same interface as [Challenge 05](/challenge/ring-buffer) — but the producer
+  and consumer now run on **different CCXes** with separate L3 caches.
+
+  ### What is a CCX?
+
+  AMD Ryzen and EPYC processors are built from **Core Complexes (CCXes)** —
+  groups of 3-4 cores that share an L3 cache. Multiple CCXes are connected
+  via the **Infinity Fabric (IF)**, an on-die interconnect. Intel uses a
+  similar topology on recent chips — Alder Lake and later split cores into
+  P-core and E-core clusters with separate cache domains, and multi-die
+  Xeons (Sapphire Rapids, Granite Rapids) use the **EMIB** interconnect
+  between tiles.
+
+  In Challenge 05, both threads share the same L3. A cache line bounce
+  between cores costs ~10-15ns. In this challenge, every cache line that
+  crosses between CCXes travels through the Infinity Fabric at **~70-80ns
+  on Zen 2** (~40-50ns on Zen 4/5). Your Challenge 05 solution will work —
+  but it will be slow. How slow? Submit it and find out.
+
+  This is the reality of modern multi-core systems. In production HFT
+  systems, the producer (network thread) and consumer (strategy thread)
+  often land on different CCXes or even different NUMA nodes. Optimizing
+  for this topology is not optional.
+
+  ### API
+
+  Identical to Challenge 05:
+
+  ```cpp
+  namespace hftu {
+  class RingBuffer {
+  public:
+      explicit RingBuffer(size_t capacity);
+      bool push(const Message& msg);
+      bool pop(Message& out);
+      size_t size() const;
+  };
+  }
+  ```
+
+  - Capacity is always a power of 2
+  - Must be thread-safe for one producer + one consumer (no mutexes)
+  - Producer and consumer run on separate CCXes (separate L3 caches)
+
+  ### Hints
+
+  - Count the number of cache lines that cross the Infinity Fabric per
+    operation in your current solution.
+  - Ask yourself: which of those crossings are strictly necessary?
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-17-cross-ccx-ring
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+
+  > **Tip:** Your Challenge 05 solution is a valid starting point. Submit it
+  > first to see the cross-CCX penalty, then optimize from there.
+
+  > **Note:** The public benchmark you run locally uses a different seed and
+  > workload than the certified benchmark on the server. Your local score may
+  > differ significantly from your submitted score.
+time_limit_seconds: 60
+memory_limit_mb: 2048
+daily_submission_limit: 10
+published: true
+goals:
+  - key: fastest
+    name: Lowest Latency
+    benchmark: BM_Solution
+    unit: cycles/op
+    order: asc
+badges:
+  gold: 350
+  silver: 600
+  bronze: 1000
+weight: 2.5
