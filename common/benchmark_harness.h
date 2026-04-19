@@ -7,6 +7,7 @@
 //   START: CPUID (serialize) -> RDTSC (read counter)
 //   END:   RDTSCP (read counter + serialize) -> CPUID (full drain)
 
+#include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -235,9 +236,9 @@ inline int run_benchmarks() {
 
         std::printf("    {\n");
         std::printf("      \"name\": \"%s\",\n", r.name);
-        std::printf("      \"iterations\": %lu,\n", r.iterations);
-        std::printf("      \"ops_per_iteration\": %lu,\n", r.ops_per_iteration);
-        std::printf("      \"total_cycles\": %lu,\n", r.total_cycles);
+        std::printf("      \"iterations\": %" PRIu64 ",\n", r.iterations);
+        std::printf("      \"ops_per_iteration\": %" PRIu64 ",\n", r.ops_per_iteration);
+        std::printf("      \"total_cycles\": %" PRIu64 ",\n", r.total_cycles);
         std::printf("      \"cycles_per_op\": %.2f\n", cycles_per_op);
         std::printf("    }%s\n", (i + 1 < results.size()) ? "," : "");
     }
