@@ -1,5 +1,7 @@
 #include "solution.h"
 
+#include <cstdlib>   // std::abs (macOS libc++ doesn't pull it in transitively)
+
 namespace hftu {
 
 ImpliedBook::ImpliedBook() = default;
