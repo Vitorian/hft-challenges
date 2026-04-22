@@ -98,14 +98,27 @@ inline uint64_t cycle_end() { return cycle_start(); }
 
 #if defined(__GNUC__) || defined(__clang__)
 
+// Constraint ordering matters: clang handles "r,m" fine, but GCC fails
+// with "impossible constraint in 'asm'" when `value` is larger than a
+// register (e.g. struct types used in some challenges). GCC needs "m,r"
+// so it prefers memory when the type won't fit in a register. This is
+// the same pattern used by Google Benchmark's DoNotOptimize.
 template <typename T>
 inline void do_not_optimize(T const& value) {
+#if defined(__clang__)
     asm volatile("" : : "r,m"(value) : "memory");
+#else
+    asm volatile("" : : "m,r"(value) : "memory");
+#endif
 }
 
 template <typename T>
 inline void do_not_optimize(T& value) {
+#if defined(__clang__)
     asm volatile("" : "+r,m"(value) : : "memory");
+#else
+    asm volatile("" : "+m,r"(value) : : "memory");
+#endif
 }
 
 inline void clobber() {
