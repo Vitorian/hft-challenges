@@ -37,7 +37,7 @@ public:
 
     uint64_t send_order(uint64_t /*our_id*/, uint16_t /*symbol*/, int /*side*/,
                         int64_t price, int64_t qty) override {
-        uint64_t eid = next_eid_++;
+        uint64_t eid = next_eid_;
         our_by_eid_[eid] = {price, qty};
         return eid;
     }
@@ -49,7 +49,7 @@ public:
 
         if (new_price != it->second.price || new_qty > it->second.qty) {
             our_by_eid_.erase(it);
-            uint64_t new_eid = next_eid_++;
+            uint64_t new_eid = next_eid_;
             our_by_eid_[new_eid] = {new_price, new_qty};
             return new_eid;
         }
@@ -323,7 +323,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             uint64_t oid = next_our_id++;
             uint64_t eid = next_eid++; // venue will assign this
 
-            wl.timed.push_back({Operation::SEND_OUR, oid, sym, side, price, qty, 0});
+            wl.timed.push_back({Operation::SEND_OUR, oid, sym, side, price, qty, eid});
 
             // Schedule ADD in feed after latency
             int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
@@ -369,7 +369,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
                 size_t trigger_at = std::max<size_t>( op_idx + static_cast<size_t>(delay) + 1, oo.min_trigger_at);
 
                 pending.push({trigger_at, {Operation::CANCEL, old_eid, 0, 0, 0, 0, 0}});
-                pending.push({trigger_at + 1, {Operation::ADD, new_eid, oo.symbol, oo.side, new_price, new_qty, 0}});
+                pending.push({trigger_at + 1, {Operation::ADD, new_eid, oo.symbol, oo.side, new_price, new_qty, new_eid}});
                 oo.min_trigger_at = trigger_at + 2;
 
                 // Update tracking
@@ -511,6 +511,7 @@ static hftu::RegisterBenchmark reg_solution(
 
             // Timed — per-operation measurement
             for (const auto& op : wl.timed) {
+                venue.reset_next_eid( op.aux );
                 uint64_t t0 = hftu::cycle_start();
                 execute_op(book, op);
                 hftu::clobber();
