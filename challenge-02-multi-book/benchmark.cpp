@@ -323,7 +323,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             uint64_t oid = next_our_id++;
             uint64_t eid = next_eid++; // venue will assign this
 
-            wl.timed.push_back({Operation::SEND_OUR, oid, sym, side, price, qty, eid});
+            wl.timed.push_back({Operation::SEND_OUR, oid, sym, side, price, qty, static_cast<int64_t>(eid)});
 
             // Schedule ADD in feed after latency
             int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
@@ -343,7 +343,7 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             if (std::uniform_int_distribution<int>(0, 99)(gen) < 60) {
                 // Qty-down: keeps position
                 int64_t new_qty = std::max(int64_t(1), oo.qty * std::uniform_int_distribution<int64_t>(30, 90)(gen) / 100);
-                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, oo.price, new_qty, oo.exchange_id});
+                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, oo.price, new_qty, static_cast<int64_t>(oo.exchange_id)});
 
                 // Feed: modify with same eid
                 int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
@@ -363,13 +363,13 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
                 uint64_t old_eid = oo.exchange_id;
                 uint64_t new_eid = next_eid++; // venue will assign this
 
-                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, new_price, new_qty, new_eid});
+                wl.timed.push_back({Operation::MODIFY_OUR, oo.our_id, 0, 0, new_price, new_qty, static_cast<int64_t>(new_eid)});
 
                 int delay = std::uniform_int_distribution<int>(3, cfg.our_order_latency)(gen);
                 size_t trigger_at = std::max<size_t>( op_idx + static_cast<size_t>(delay) + 1, oo.min_trigger_at);
 
                 pending.push({trigger_at, {Operation::CANCEL, old_eid, 0, 0, 0, 0, 0}});
-                pending.push({trigger_at + 1, {Operation::ADD, new_eid, oo.symbol, oo.side, new_price, new_qty, new_eid}});
+                pending.push({trigger_at + 1, {Operation::ADD, new_eid, oo.symbol, oo.side, new_price, new_qty, static_cast<int64_t>(new_eid)}});
                 oo.min_trigger_at = trigger_at + 2;
 
                 // Update tracking
