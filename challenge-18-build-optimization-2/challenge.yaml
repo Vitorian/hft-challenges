@@ -1,0 +1,96 @@
+title: "Challenge 18: Build Optimization II"
+slug: build-optimization-2
+track: cpp_latency
+description: |
+  A second flags-only challenge. The code is frozen — your only lever is the
+  `// CXXFLAGS=` line in `solution/solution.h`. Same rules as Challenge 14,
+  but the bottleneck is different.
+
+  The benchmark splits its hot path across multiple translation units, with
+  parts living in a separate shared library next to the main executable.
+  Per-iteration work is tiny; per-iteration **machinery** is what costs you.
+
+  ### The Architecture
+
+  - `benchmark.cpp` — the hot loop. Calls `mix()` once per input element.
+  - `libhotpath.so` — built from `hotpath.cpp` + `inner.cpp`. Defines
+    `mix()`, which calls `inner()` defined in the same shared library.
+
+  ```
+  benchmark.cpp::process_burst()  -->  libhotpath.so::mix()  -->  libhotpath.so::inner()
+  ```
+
+  Both `mix()` and `inner()` are tiny — a multiply-add. The work inside each
+  function is dwarfed by the cost of *getting there*. Your job is to find
+  the flags that make the call sequences cheaper.
+
+  ### The Hot Loop (frozen)
+
+  ```cpp
+  uint64_t process_burst(const uint64_t* in, size_t n) {
+      uint64_t acc = 0;
+      for (size_t i = 0; i < n; ++i) {
+          acc = mix(acc, in[i]);
+      }
+      return acc;
+  }
+  ```
+
+  ### What to Investigate
+
+  - Disassemble the hot loop in `build/benchmark` and the `mix()` function
+    in `build/libhotpath.so` with `objdump -d`. Two distinct call sequences
+    show up — one for each boundary.
+  - Each call site can be emitted in several different ways. Distros pick
+    defaults that aren't the fastest.
+  - Some flags affect **both** call boundaries; some affect only one.
+    Stacking the right ones can compound.
+
+  ### Allowed Flags
+
+  Same whitelist as Challenge 14: `-O` levels, `-f...` (including `=value`),
+  `-m...`, `-std=...`. Linker flags are not on the whitelist — they're
+  fixed by the build system.
+
+  Note: solver flags apply to **all** sources in this challenge, including
+  the `libhotpath.so` build. So whatever you discover applies to both
+  call boundaries.
+
+  ### Getting Started
+
+  ```bash
+  cd challenge-18-build-optimization-2
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ./build/benchmark
+  ```
+
+  To iterate:
+  ```bash
+  # Edit the first line of solution/solution.h, then:
+  rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
+  ./build/benchmark
+  ```
+
+  > **Note:** The public benchmark uses a different seed than the certified
+  > benchmark on the server. Your local score may differ slightly.
+
+  ### Scoring
+
+  Cycles per `mix()` call (lower is better).
+
+time_limit_seconds: 60
+memory_limit_mb: 1024
+daily_submission_limit: 10
+published: true
+goals:
+  - key: fastest
+    name: Fastest Overall
+    benchmark: burst_processing
+    unit: cycles/op
+    order: asc
+badges:
+  gold: 6.5
+  silver: 8.5
+  bronze: 10.5
+weight: 1.0
