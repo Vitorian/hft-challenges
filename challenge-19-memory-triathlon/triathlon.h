@@ -6,7 +6,7 @@
 // harness replays a recorded order-book allocation trace through it and times
 // three legs:
 //
-//     score = P99(allocate) + P99(free) + P99(access)   [cycles, lower better]
+//     score = mean(allocate) + mean(free) + mean(access)   [cycles, lower better]
 //
 // The three classes are the domain objects of a pointer-based limit-order book:
 //   Order (64 B)  — one resting order
@@ -46,7 +46,7 @@ inline constexpr const char* class_name(Class c) {
 // regime gives the expected peak LIVE count per class. The out-of-distribution
 // SURGE is deliberately NOT represented here — the allocator must size pools
 // for the regimes it is told about and still grow gracefully when a surge
-// blows past them (the P99 forgives the one-shot grow; a fixed-capacity
+// blows past them (one-shot grows are lost in the mean; a fixed-capacity
 // allocator that faults or degrades under surge loses).
 struct ShapeTable {
     static constexpr int kMaxRegimes = 4;

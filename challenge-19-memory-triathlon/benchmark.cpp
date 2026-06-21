@@ -1,7 +1,7 @@
 // Memory Triathlon — benchmark / dev driver.  (Do NOT modify.)
 //
 // Replays an allocation trace through YOUR allocator (solution/solution.h) and
-// reports  P99(allocate) + P99(free) + P99(access)  [cycles].  Result JSON goes
+// reports  mean(allocate) + mean(free) + mean(access)  [cycles].  Result JSON goes
 // to stdout (what the grader reads); a human-readable report goes to stderr.
 //
 // Locally this runs on the bundled (fetched) sample.trace. The certified run on

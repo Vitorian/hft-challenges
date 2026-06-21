@@ -4,7 +4,7 @@ Write a **custom allocator** for the three size classes of a limit-order book,
 and win three timed legs at once:
 
 ```
-score = P99(allocate) + P99(free) + P99(access)    // CPU cycles, lower is better
+score = mean(allocate) + mean(free) + mean(access)    // CPU cycles, lower is better
 ```
 
 ## The trace
@@ -52,7 +52,7 @@ public:
 1. **allocate / free** — pool the three classes; an O(1) free-list (pop on
    allocate, push on deallocate) crushes `malloc`. Pre-size from the ShapeTable.
 2. **access** — keep each hot symbol's working set cache-resident via placement.
-3. **surge** — grow lazily under the flood; the one-off growth is forgiven by P99.
+3. **surge** — grow lazily under the flood; a handful of one-off grows are lost in the mean.
 
 ## Build & run
 

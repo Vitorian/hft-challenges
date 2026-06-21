@@ -6,7 +6,7 @@ description: |
   order-book allocation trace through it and time three legs at once:
 
   ```
-  score = P99(allocate) + P99(free) + P99(access)    // CPU cycles, lower wins
+  score = mean(allocate) + mean(free) + mean(access)    // CPU cycles, lower wins
   ```
 
   ### The workload
@@ -41,9 +41,9 @@ description: |
   per class. Size your pools for it. But the certified trace contains a secret
   **out-of-distribution surge**: at a moment you are not told, order flow floods
   far past every regime in the table (think 4×+ the live population), then
-  drains. You must **grow gracefully** — a few large slab allocations, a one-off
-  hiccup that P99 forgives. An allocator that faults, or degrades across the
-  whole surge, does not.
+  drains. You must **grow gracefully** — a few large slab allocations whose one-off
+  cost is lost in the mean. An allocator that faults, or degrades across the
+  whole surge, is not.
 
   ### Correctness is enforced
 
@@ -79,8 +79,9 @@ goals:
     unit: cycles
     order: asc
 badges:
-  # Hz2-calibrated on the held-out trace: baseline 1984, gold 682.
-  gold: 750
-  silver: 1100
-  bronze: 1500
+  # Hz2-calibrated on the held-out trace, mean-per-leg scoring:
+  #   malloc baseline ~458, naive pool ~266 (silver), engineered ~226 (gold).
+  gold: 250
+  silver: 300
+  bronze: 420
 weight: 4.0

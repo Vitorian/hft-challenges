@@ -3,11 +3,19 @@
 //
 // Loads a recorded allocation trace (TRITRC01), replays it through a solver's
 // tri::Allocator, times the three legs, runs the address-derived integrity
-// check, and reports P99(alloc) + P99(free) + P50(access).
+// check, and reports mean(alloc) + mean(free) + mean(access).
+//
+// Scoring is the per-leg MEAN (not P99): the per-op rdtsc floor (~tens of cycles,
+// quantized to coarse steps) is a constant that cancels in cross-solver ranking,
+// and averaging millions of ops gives sub-cycle resolution — so solvers rank by
+// real allocator quality instead of clustering on a quantized P99 tail. The mean
+// is still surge-forgiving: a handful of one-off slab-grow ops out of millions
+// carry negligible weight, while a sustained-slow allocator's mean rises.
 //
 // Templated on the allocator so there is no vtable on the timed path.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -98,8 +106,8 @@ struct Result {
     uint32_t alloc_p50 = 0, alloc_p99 = 0;
     uint32_t free_p50 = 0,  free_p99 = 0;
     uint32_t access_p50 = 0, access_p90 = 0, access_p99 = 0;
-    double   access_mean = 0;
-    uint64_t score = 0;            // P99(alloc) + P99(free) + P99(access)
+    double   alloc_mean = 0, free_mean = 0, access_mean = 0;
+    uint64_t score = 0;            // round(mean(alloc) + mean(free) + mean(access))
     uint64_t integrity_fails = 0;
     uint64_t null_allocs = 0;
     uint32_t peak_live = 0;
@@ -162,19 +170,23 @@ Result replay(const Trace& tr, const ShapeTable& shapes, uint64_t salt) {
             uint64_t t1 = tsc();
             uint32_t dt = uint32_t(t1 - t0);
             t_access.push_back(dt);
-            R.access_mean += dt;
             R.n_access++;
             if (a != tok_head(p, e.handle, salt) || b != tok_tail(p, e.handle, salt))
                 R.integrity_fails++;
         }
     }
 
+    auto mean = [](const std::vector<uint32_t>& v) -> double {
+        if (v.empty()) return 0.0;
+        double s = 0; for (uint32_t x : v) s += x;
+        return s / double(v.size());
+    };
+    R.alloc_mean = mean(t_alloc);  R.free_mean = mean(t_free);  R.access_mean = mean(t_access);
     R.alloc_p50 = pct(t_alloc, 0.50);  R.alloc_p99 = pct(t_alloc, 0.99);
     R.free_p50  = pct(t_free, 0.50);   R.free_p99  = pct(t_free, 0.99);
     R.access_p50 = pct(t_access, 0.50); R.access_p90 = pct(t_access, 0.90);
     R.access_p99 = pct(t_access, 0.99);
-    if (R.n_access) R.access_mean /= double(R.n_access);
-    R.score = uint64_t(R.alloc_p99) + R.free_p99 + R.access_p99;
+    R.score = uint64_t(std::llround(R.alloc_mean + R.free_mean + R.access_mean));
     return R;
 }
 
@@ -184,12 +196,12 @@ inline void print_result(const char* label, const Result& R) {
     std::fprintf(stderr, "events: alloc=%llu free=%llu access=%llu  peak_live=%u\n",
                 (unsigned long long)R.n_alloc, (unsigned long long)R.n_free,
                 (unsigned long long)R.n_access, R.peak_live);
-    std::fprintf(stderr, "  allocate  P50=%-6u P99=%-6u\n", R.alloc_p50, R.alloc_p99);
-    std::fprintf(stderr, "  free      P50=%-6u P99=%-6u\n", R.free_p50, R.free_p99);
-    std::fprintf(stderr, "  access    P50=%-6u P90=%-6u P99=%-6u mean=%.1f\n",
-                R.access_p50, R.access_p90, R.access_p99, R.access_mean);
-    std::fprintf(stderr, "  SCORE = P99(alloc)+P99(free)+P99(access) = %u+%u+%u = %llu cyc\n",
-                R.alloc_p99, R.free_p99, R.access_p99, (unsigned long long)R.score);
+    std::fprintf(stderr, "  allocate  mean=%-7.2f P50=%-6u P99=%-6u\n", R.alloc_mean, R.alloc_p50, R.alloc_p99);
+    std::fprintf(stderr, "  free      mean=%-7.2f P50=%-6u P99=%-6u\n", R.free_mean, R.free_p50, R.free_p99);
+    std::fprintf(stderr, "  access    mean=%-7.2f P50=%-6u P90=%-6u P99=%-6u\n",
+                R.access_mean, R.access_p50, R.access_p90, R.access_p99);
+    std::fprintf(stderr, "  SCORE = mean(alloc)+mean(free)+mean(access) = %.2f+%.2f+%.2f = %llu cyc\n",
+                R.alloc_mean, R.free_mean, R.access_mean, (unsigned long long)R.score);
     std::fprintf(stderr, "  integrity fails: %llu   null allocs: %llu\n",
                 (unsigned long long)R.integrity_fails, (unsigned long long)R.null_allocs);
 }
@@ -206,8 +218,10 @@ inline void print_json(const char* bench_name, const Result& R) {
         return;
     }
     std::printf("{\"benchmarks\":[{\"name\":\"%s\",\"cycles_per_op\":%llu,"
+                "\"alloc_mean\":%.2f,\"free_mean\":%.2f,\"access_mean\":%.2f,"
                 "\"alloc_p99\":%u,\"free_p99\":%u,\"access_p99\":%u,\"peak_live\":%u}]}\n",
                 bench_name, (unsigned long long)R.score,
+                R.alloc_mean, R.free_mean, R.access_mean,
                 R.alloc_p99, R.free_p99, R.access_p99, R.peak_live);
 }
 

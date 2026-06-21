@@ -5,7 +5,7 @@
 // classes (Order 64B / Level 128B / Shard 256B). The harness replays a recorded
 // order-book allocation trace through it and times three legs:
 //
-//     score = P99(allocate) + P99(free) + P99(access)   [cycles, lower wins]
+//     score = mean(allocate) + mean(free) + mean(access)   [cycles, lower wins]
 //
 // The baseline below just forwards to aligned malloc/free and ignores the
 // hotness hint. It is correct but slow — beat it.
@@ -18,7 +18,7 @@
 //     set stays cache-resident; that wins the access tail.
 //   * survive the SURGE — the certified trace floods far past the ShapeTable's
 //     sizes at a secret moment. Grow your pools lazily (a few large slabs); the
-//     one-off growth is forgiven by P99, but faulting or degrading is not.
+//     one-off growth is lost in the mean, but faulting or degrading is not.
 //
 // Rules:
 //   * Return at least kSize[c] bytes, aligned to kAlign[c] (64).
