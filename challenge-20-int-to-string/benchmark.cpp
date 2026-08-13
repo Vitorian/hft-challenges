@@ -9,9 +9,22 @@
 
 namespace {
 
-// Digit-length-uniform workload: digit count k drawn uniformly from 1..20,
-// then a value uniform within that decimal range. Every output length is
-// equally likely — a solution that is only fast for short numbers won't win.
+// Workload: the "execution-report field mix". Each conversion is one numeric
+// field of a synthetic execution report, drawn i.i.d.:
+//
+//   30%  quantity    log-uniform over [0, 10^6)        -> 1-6 digits
+//   25%  price       log-uniform over [10^4, 10^8)     -> 5-8 digits
+//                    (a $1-$10,000 price scaled by 10^4, ITCH-style)
+//   25%  order id    log-uniform over [10^9, 10^19)    -> 10-19 digits
+//   10%  seq number  uniform over [1, 10^10]           -> mostly 10 digits
+//   10%  timestamp   uniform ns-since-midnight over the
+//                    09:30-16:00 session                -> always 14 digits
+//
+// "log-uniform" = digit count first (uniform over the range), then a value
+// uniform within that decimal decade — every length in the field's range is
+// equally likely. Field weights follow the numeric-field census of a FIX
+// ExecutionReport. Full rationale, sources, and the resulting per-digit
+// table are in the README.
 std::vector<uint64_t> make_values(uint64_t seed, size_t n) {
     static constexpr uint64_t POW10[20] = {
         1ULL, 10ULL, 100ULL, 1000ULL, 10000ULL,
@@ -24,14 +37,22 @@ std::vector<uint64_t> make_values(uint64_t seed, size_t n) {
     hftu::Rng rng(seed);
     std::vector<uint64_t> v(n);
     for (size_t i = 0; i < n; ++i) {
-        const int k = static_cast<int>(rng.next_range(20)) + 1; // digits 1..20
+        const uint64_t roll = rng.next_range(100);
         uint64_t lo, span;
-        if (k == 1) {
-            lo = 0; span = 10;
-        } else if (k == 20) {
-            lo = POW10[19]; span = UINT64_MAX - POW10[19] + 1;
-        } else {
+        if (roll < 30) {        // quantity: digits 1..6 (0 allowed: LeavesQty)
+            const int k = static_cast<int>(rng.next_range(6)) + 1;
+            lo = (k == 1) ? 0 : POW10[k - 1];
+            span = POW10[k] - lo;
+        } else if (roll < 55) { // price: digits 5..8
+            const int k = static_cast<int>(rng.next_range(4)) + 5;
             lo = POW10[k - 1]; span = POW10[k] - lo;
+        } else if (roll < 80) { // order/exec id: digits 10..19
+            const int k = static_cast<int>(rng.next_range(10)) + 10;
+            lo = POW10[k - 1]; span = POW10[k] - lo;
+        } else if (roll < 90) { // sequence number: uniform [1, 10^10]
+            lo = 1; span = 10'000'000'000ULL;
+        } else {                // timestamp: ns since midnight, 09:30-16:00
+            lo = 34'200'000'000'000ULL; span = 23'400'000'000'000ULL;
         }
         v[i] = lo + rng.next_range(span);
     }
