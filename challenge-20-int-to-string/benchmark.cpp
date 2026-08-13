@@ -44,15 +44,22 @@ static hftu::RegisterBenchmark reg_solution(
     "BM_Solution", 1'000'000,
     [](int iterations) -> uint64_t {
         const std::vector<uint64_t> values = make_values(0x175A57, 1'000'000);
+        // Conversions run in batches of 16, each into its own 32-byte slot —
+        // like a FIX encoder emitting the numeric fields of one message.
+        // Independent conversions may overlap in the pipeline; the score is
+        // still average cycles per conversion.
+        constexpr size_t kBatch = 16;
+        static_assert(1'000'000 % kBatch == 0);
         uint64_t total = 0;
         for (int i = 0; i < iterations; ++i) {
-            alignas(64) char buf[32];
-            char* escaped = buf;
-            hftu::do_not_optimize(escaped); // buf's address escapes: stores are real
+            alignas(64) char out[kBatch * 32];
+            char* escaped = out;
+            hftu::do_not_optimize(escaped); // out's address escapes: stores are real
             uint64_t acc = 0;
             uint64_t start = hftu::cycle_start();
-            for (size_t j = 0; j < values.size(); ++j) {
-                acc += hftu::u64_to_chars(values[j], buf);
+            for (size_t j = 0; j < values.size(); j += kBatch) {
+                for (size_t k = 0; k < kBatch; ++k)
+                    acc += hftu::u64_to_chars(values[j + k], out + k * 32);
                 hftu::clobber();
             }
             hftu::do_not_optimize(acc);

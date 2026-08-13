@@ -24,7 +24,10 @@ Contract:
 
 The benchmark converts a stream of values whose digit count is uniform in
 1–20 (then uniform within that decimal range) — every output length is
-equally likely. Score is average cycles per conversion.
+equally likely. Conversions run in batches of 16 independent values, each
+into its own 32-byte slot — like an encoder emitting the numeric fields of
+one message back-to-back — so consecutive calls can overlap in the
+pipeline. Score is average cycles per conversion.
 
 Build and run locally:
 
