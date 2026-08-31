@@ -30,6 +30,7 @@ inline int pin_to_isolated(int) { return -1; }
 // ---------------------------------------------------------------------------
 // TSC cycle measurement
 // On x86: CPUID+RDTSC/RDTSCP+CPUID per Intel white paper 324264-001.
+// On ARM64: cntvct_el0 virtual timer counter (fixed-frequency ticks, not cycles).
 // On other platforms: fallback to clock_gettime (nanoseconds, not cycles).
 // Scores from non-x86 platforms are NOT comparable to certified scores.
 // ---------------------------------------------------------------------------
@@ -64,9 +65,9 @@ inline uint64_t cycle_end() {
 
 #elif defined(__aarch64__) || defined(_M_ARM64)
 
-// ARM64: use the Performance Monitors cycle counter (PMCCNTR_EL0).
-// Falls back to clock_gettime if the counter is not accessible.
-#include <time.h>
+// ARM64: read cntvct_el0, the generic virtual timer counter. It ticks at a
+// fixed frequency (typically 24MHz-1GHz), not at CPU clock — values are timer
+// ticks, not cycles, so they are NOT comparable to certified x86 scores.
 
 inline uint64_t _arm64_rdtsc() {
     uint64_t val;

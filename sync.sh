@@ -64,8 +64,9 @@ while IFS= read -r dir; do
         git checkout "$REF" -- "${files[@]}"
     fi
 
-    # Seed the baseline solution/ ONLY if you don't already have one (never clobber).
-    if [ ! -e "$dir/solution/solution.h" ]; then
+    # Seed the baseline solution/ ONLY if you don't already have one (never
+    # clobber). Any existing file counts — C++ uses solution.h/.cpp, Rust mod.rs.
+    if [ -z "$(ls -A "$dir/solution" 2>/dev/null)" ]; then
         mapfile -t sol < <(git ls-tree -r --name-only "$REF" -- "$dir/solution/" || true)
         if [ "${#sol[@]}" -gt 0 ]; then
             git checkout "$REF" -- "${sol[@]}"
