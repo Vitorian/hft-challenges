@@ -79,8 +79,15 @@ The binary is named `benchmark` (`cargo build --release` puts it at
 ## Rules
 
 - Edit **only** files inside `solution/` directories
-- **C++**: code is built with C++23 and `-O2 -march=native` (see `common/challenge.cmake`).
+- **C++**: the default build is C++23 with `-O2 -march=native` (see `common/challenge.cmake`).
   No inline assembly, no compiler-specific intrinsics (unless a challenge states otherwise)
+- **C++ build options are yours to tune.** If `solution/libraries.cmake` exists, the build
+  includes it: use it for link libraries and for compile options, LTO included
+  (`target_compile_options(benchmark PRIVATE ...)`). Pragmas and attributes in your own
+  sources are fine too. The benchmark, timing code and correctness checks are fixed.
+  Challenges 14 and 18 are the dedicated build-tuning challenges.
+- Exploratory research is always welcome and encouraged. If you find a flag, pragma or trick
+  that moves the numbers, share it on the forum
 - **Rust**: solutions must be 100% safe Rust — `unsafe`, `std::process`, `std::net`,
   `std::fs`, `asm!` and FFI are rejected by the submission scanner
 - [Pre-installed libraries](https://hftuniversity.com/challenges/libraries) (Boost, Abseil,
