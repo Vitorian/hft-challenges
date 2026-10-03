@@ -6,7 +6,8 @@
 // Invariants:
 //   - advance() is always called with monotonically increasing time
 //   - Events at the same microsecond may fire in any order
-//   - event_id values are unique across the lifetime of the scheduler
+//   - This workload never reuses an event_id, but a solution must still handle it:
+//     schedule() on an id that is already pending replaces it (see solution/solution.h)
 
 #include "common/benchmark_harness.h"
 #include "solution/solution.h"
