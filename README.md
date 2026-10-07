@@ -80,7 +80,7 @@ The binary is named `benchmark` (`cargo build --release` puts it at
 
 - Edit **only** files inside `solution/` directories
 - **C++**: the default build is C++23 with `-O2 -march=native` (see `common/challenge.cmake`).
-  No inline assembly, no compiler-specific intrinsics (unless a challenge states otherwise)
+  Compiler intrinsics (`<immintrin.h>`, `__builtin_*`, etc.) and inline assembly are allowed
 - **C++ build options are yours to tune.** If `solution/libraries.cmake` exists, the build
   includes it: use it for link libraries and for compile options, LTO included
   (`target_compile_options(benchmark PRIVATE ...)`). Pragmas and attributes in your own

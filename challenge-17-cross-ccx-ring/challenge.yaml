@@ -58,6 +58,10 @@ description: |
 
   - Capacity is always a power of 2
   - Must be thread-safe for one producer + one consumer (no mutexes)
+  - `pop()` must return every field exactly as it was pushed, for any value of
+    the field's type. Narrowing or compressing fields to fit the values the
+    benchmark happens to use is not allowed. Each run is checked for this and
+    by a concurrent stress test (small capacities, random timing).
   - Producer and consumer run on separate CCXes (separate L3 caches)
 
   ### Hints
