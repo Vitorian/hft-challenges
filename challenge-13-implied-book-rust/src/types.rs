@@ -17,7 +17,8 @@ pub struct BookUpdate {
 pub trait ImpliedBook {
     fn new() -> Self;
 
-    /// Define the synthetic instrument.
+    /// Define the synthetic instrument and start from empty outright books.
+    /// Called before each benchmark run, possibly on the same instance.
     /// weights: per-leg multiplier (e.g. [+1, -2, +1] for butterfly)
     /// depth: number of output levels per side
     /// NOT timed.
@@ -25,6 +26,7 @@ pub trait ImpliedBook {
 
     /// Apply an update to one outright book.
     /// Returns (num_bids, num_asks) written to out_bids/out_asks.
+    /// out_bids and out_asks have capacity for `depth` levels.
     fn on_update(&mut self, update: &BookUpdate,
                  out_bids: &mut [Level], out_asks: &mut [Level]) -> (usize, usize);
 }
