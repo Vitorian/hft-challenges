@@ -128,6 +128,6 @@ phase will be penalized even if their average latency is fast.
 ## Constraints
 
 - Single-threaded execution -- no threads, no async
-- No external libraries -- standard C++ only
+- Libraries: anything on the pre-installed list at <https://hftuniversity.com/challenges/libraries>. Boost headers and Abseil are linked automatically; for the others add a `solution/libraries.cmake` as described there
 - Time limit: 120 seconds
-- Memory limit: 1024 MB
+- Memory limit: 2048 MB
