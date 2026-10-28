@@ -44,7 +44,8 @@ High-performance coding challenges with certified benchmark results.
 
 | # | FPGA challenge | Verilog / SystemVerilog | C++ (Vitis HLS) |
 |---|----------------|-------------------------|-----------------|
-| FPGA 01 | UDP Echo | `fpga-01-udp-echo` | `fpga-01-udp-echo-hls` |
+| FPGA 01 | Cut-Through UDP Echo | `fpga-01-udp-echo` | `fpga-01-udp-echo-hls` |
+| FPGA 02 | Low-Latency 10GBASE-R Receive Path | `fpga-02-10g-rx` | — |
 
 Challenges 05, 06 and 17 are multi-threaded and are not ported to Rust (they would
 require `unsafe`, which is not allowed in Rust solutions). Full problem statements,
