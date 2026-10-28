@@ -73,7 +73,7 @@ while IFS= read -r dir; do
             echo "  seeded $dir/solution/ (baseline — edit this)"
         fi
     fi
-done < <(git ls-tree -d --name-only "$REF" | grep '^challenge-' || true)
+done < <(git ls-tree -d --name-only "$REF" | grep -E '^(challenge|fpga)-' || true)
 
 # Root docs.
 git checkout "$REF" -- README.md 2>/dev/null || true

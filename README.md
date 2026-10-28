@@ -1,4 +1,4 @@
-# HFT University — Microbenchmark Challenges (C++ & Rust)
+# HFT University — Microbenchmark Challenges (C++, Rust & FPGA)
 
 High-performance coding challenges with certified benchmark results.
 
@@ -42,6 +42,10 @@ High-performance coding challenges with certified benchmark results.
 | 19 | Memory Triathlon | `challenge-19-memory-triathlon` | — |
 | 20 | Fast Integer-to-String | `challenge-20-int-to-string` | — |
 
+| # | FPGA challenge | Verilog / SystemVerilog | C++ (Vitis HLS) |
+|---|----------------|-------------------------|-----------------|
+| FPGA 01 | UDP Echo | `fpga-01-udp-echo` | `fpga-01-udp-echo-hls` |
+
 Challenges 05, 06 and 17 are multi-threaded and are not ported to Rust (they would
 require `unsafe`, which is not allowed in Rust solutions). Full problem statements,
 scoring goals and badge thresholds are on each challenge's page at
@@ -72,6 +76,22 @@ cargo run --release
 The binary is named `benchmark` (`cargo build --release` puts it at
 `target/release/benchmark`).
 
+## Testing Locally — FPGA
+
+Requirements: podman or docker. Each FPGA challenge's `test.sh` builds a small simulation
+image (cocotb, Icarus Verilog, Verilator) on first use and runs the challenge's tests on your
+`solution/`. The HLS lane needs Vitis HLS 2026.1 (`./build.sh`) to turn your C++ into RTL first,
+and `./timing.sh` needs Vivado 2026.1; both are free for Alveo targets, setup in
+[common/fpga/SETUP.md](common/fpga/SETUP.md).
+
+```bash
+cd fpga-01-udp-echo
+./test.sh              # writes results/results.json
+```
+
+The server runs the same tests with its own seeds and more traffic, then checks timing in a
+nightly Vivado run: a score counts only once the design meets timing.
+
 > Local runs are for iterating on your solution. Local numbers are **not** comparable to
 > certified scores — the server runs a private variant of each benchmark with fixed
 > iteration counts and different seeds on isolated CPU cores.
@@ -92,6 +112,11 @@ The binary is named `benchmark` (`cargo build --release` puts it at
   `std::fs`, `asm!` and FFI are rejected by the submission scanner
 - [Pre-installed libraries](https://hftuniversity.com/challenges/libraries) (Boost, Abseil,
   TBB, etc.) are available for C++ — see the full list on the website
+- **FPGA**: `solution/` is flat (no subdirectories or symlinks). RTL lane: Verilog/SystemVerilog
+  sources plus `.mem`/`.hex`/`.dat` data files; system tasks that touch the host (`$system`,
+  `$fopen`, ...) are rejected, and `$readmem*` may only read a file in your `solution/`. HLS lane:
+  C++ including only your own files, the standard library and the `ap_*`/`hls_*` headers. Each
+  challenge's README lists the details
 - Time limits, memory limits and daily submission limits are per-challenge — see the
   challenge's page on the website
 
