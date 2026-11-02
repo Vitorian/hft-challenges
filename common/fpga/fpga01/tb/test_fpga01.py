@@ -117,7 +117,8 @@ class Harness:
                 d.s_tkeep.value = (1 << len(chunk)) - 1
                 d.s_tvalid.value = 1
                 d.s_tlast.value = int(i == nbeats - 1)
-                d.s_tuser.value = int(bad and i == nbeats - 1)
+                # the MAC flags runts (under 60 bytes) bad, as the contract says
+                d.s_tuser.value = int((bad or len(frame) < 60) and i == nbeats - 1)
                 if i == 0:
                     self.in_first.append(now_ps() // PERIOD_PS)
             for _ in range(gap):

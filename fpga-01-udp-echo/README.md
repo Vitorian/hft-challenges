@@ -30,8 +30,12 @@ hands over: Ethernet header onwards, no preamble, no FCS (the transmit MAC appen
 
 - **Bytes:** byte 0 of the frame is `tdata[7:0]` of the first beat, byte 7 is `tdata[63:56]`.
   `tkeep` is all ones except on the last beat, where it is a contiguous low mask.
-- **Input cannot be stalled:** there is no `tready`. A beat arrives whenever `s_tvalid` is high, and
-  frames can arrive back to back with no idle cycle between them.
+- **Input cannot be stalled:** there is no `tready`. A beat arrives whenever `s_tvalid` is high. The
+  beats of a frame arrive on consecutive cycles (`s_tvalid` stays high from its first beat to
+  `s_tlast`), and frames can arrive back to back with no idle cycle between them.
+- **Frame sizes:** a frame is at least 60 bytes (the Ethernet minimum, without FCS). Like a real
+  receive MAC, the input sets `s_tuser` on the last beat of anything shorter (a runt), so a runt is a
+  bad frame and the rule for bad frames below covers it.
 - **Output must not pause inside a frame:** once a frame's first beat is out, its beats must follow
   on consecutive cycles until `m_tlast` (the transmit MAC aborts a frame that runs dry).
 - **Echo exactly these frames:** EtherType `0x0800`, IPv4 with no options (byte 14 = `0x45`),
@@ -42,9 +46,10 @@ hands over: Ethernet header onwards, no preamble, no FCS (the transmit MAC appen
   36-37). Change nothing else: swapping source and destination leaves the IP and UDP checksums
   valid, so no checksum arithmetic is needed.
 - **Drop everything else:** other ports or addresses, TCP, ARP, VLAN tags, IPv6, IP options,
-  fragments, runts.
-- **Bad frames:** a frame with `s_tuser` set on its last beat failed its FCS check. Drop it, or echo
-  it with `m_tuser` set on its last beat (so the transmit MAC aborts it). Never echo it as good.
+  fragments.
+- **Bad frames:** a frame with `s_tuser` set on its last beat failed its FCS check or is a runt. Drop
+  it, or echo it with `m_tuser` set on its last beat (so the transmit MAC aborts it). Never echo it
+  as good.
 
 ## What solution/ may contain
 
