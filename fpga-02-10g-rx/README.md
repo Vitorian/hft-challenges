@@ -54,6 +54,9 @@ payload bits 7:0 are the block type; data lane n is payload bits 8n+7:8n.
 - **Lock:** `block_lock` must come up before the first frame (the test streams idle for 400 blocks
   first, enough for any clause 49 search). After a deliberate loss of lock, frames that arrive while
   your receiver re-locks are optional.
+- **Frame sizes:** standard Ethernet, no jumbo frames: 64 to 1518 bytes on the line including the
+  FCS, so 60 to 1514 bytes out of your receiver. A frame longer than that may be cut and flagged bad
+  (`m_tuser` = 1 on its last beat).
 
 ## What solution/ may contain
 
