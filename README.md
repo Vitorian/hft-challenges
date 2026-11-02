@@ -107,8 +107,13 @@ nightly Vivado run: a score counts only once the design meets timing.
   (`target_compile_options(benchmark PRIVATE ...)`). Pragmas and attributes in your own
   sources are fine too. The benchmark, timing code and correctness checks are fixed.
   Challenges 14 and 18 are the dedicated build-tuning challenges.
-- Exploratory research is always welcome and encouraged. If you find a flag, pragma or trick
-  that moves the numbers, share it on the forum
+- Exploring is welcome: flags, pragmas, data layouts and local experiments, and if you find a
+  trick that moves the numbers, share it on the forum. **A submission is for scoring, not for
+  measuring.** Do not use submissions to probe the certified server or to carry data back to
+  you (through validation messages, deliberately failing runs, the score itself, build output
+  or any other channel); the worker rejects solutions that print, exit, open files or touch
+  the harness registries, and shows you only the names of failed checks. The public harness is
+  identical to the certified one except for seeds, so measure locally
 - **Rust**: solutions must be 100% safe Rust — `unsafe`, `std::process`, `std::net`,
   `std::fs`, `asm!` and FFI are rejected by the submission scanner
 - [Pre-installed libraries](https://hftuniversity.com/challenges/libraries) (Boost, Abseil,
