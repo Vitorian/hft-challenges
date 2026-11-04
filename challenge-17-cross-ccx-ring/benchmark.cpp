@@ -184,14 +184,19 @@ inline bool message_ok(const hftu::Message& m, size_t i, uint64_t ts) {
 }
 
 // Shared state between the producer (main thread) and the consumer thread.
-hftu::RingBuffer* g_rb = nullptr;
+// The histogram (written by the consumer on every pop) gets its own cache
+// lines: before 2026-11-03 GCC placed its running sum in the line that held
+// g_rb, which the producer loaded on every push, so every message paid one
+// extra line transfer between the two cores (a fabric crossing on Challenge
+// 17). The hot loops below also keep the ring pointer in a local.
+alignas(64) hftu::RingBuffer* g_rb = nullptr;
 const std::vector<uint64_t>* g_sched = nullptr;
 uint64_t g_start = 0;
 std::atomic<int> g_round_signal{-1};
 std::atomic<int> g_round_done{-1};
 std::atomic<bool> g_shutdown{false};
 std::atomic<uint64_t> g_bad_messages{0};
-LatencyHistogram g_hist;
+alignas(64) LatencyHistogram g_hist;
 
 void consumer_thread_fn() {
     hftu::pin_to_isolated(CONSUMER_CPU_INDEX);
@@ -207,10 +212,11 @@ void consumer_thread_fn() {
         const uint64_t* sched = g_sched->data();
         const size_t n_ops = g_sched->size();
         const uint64_t start = g_start;
+        hftu::RingBuffer* const rb = g_rb;   // never reload a global in the loop
         uint64_t bad = 0;
         hftu::Message msg{};
         for (size_t n = 0; n < n_ops;) {
-            if (g_rb->pop(msg)) {
+            if (rb->pop(msg)) {
                 uint64_t now = rdtsc_fenced();
                 uint64_t due = start + sched[n];
                 if (!message_ok(msg, n, due)) ++bad;
@@ -231,11 +237,14 @@ RoundResult run_round(const std::vector<uint64_t>& sched, int round_id) {
 
     hftu::Message msg{};
     const uint64_t start = g_start;
-    for (size_t i = 0; i < sched.size(); ++i) {
-        const uint64_t due = start + sched[i];
+    hftu::RingBuffer* const rb = g_rb;   // never reload a global in the loop
+    const uint64_t* const s = sched.data();
+    const size_t n_ops = sched.size();
+    for (size_t i = 0; i < n_ops; ++i) {
+        const uint64_t due = start + s[i];
         while (rdtsc_raw() < due) {}
         fill_message(msg, i, due);
-        while (!g_rb->push(msg)) {}
+        while (!rb->push(msg)) {}
     }
     while (g_round_done.load(std::memory_order_acquire) != round_id) {}
     return {g_hist.mean(), g_hist.percentile(0.50), g_hist.percentile(0.99)};
