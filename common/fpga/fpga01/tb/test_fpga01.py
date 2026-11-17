@@ -118,7 +118,7 @@ class Harness:
                 d.s_tvalid.value = 1
                 d.s_tlast.value = int(i == nbeats - 1)
                 # the MAC flags runts (under 60 bytes) bad, as the contract says
-                d.s_tuser.value = int((bad or len(frame) < 60) and i == nbeats - 1)
+                d.s_tuser.value = int(model.is_bad(frame, bad) and i == nbeats - 1)
                 if i == 0:
                     self.in_first.append(now_ps() // PERIOD_PS)
             for _ in range(gap):
@@ -146,7 +146,8 @@ async def run_case(dut, name, schedule):
     expected = []   # (index into schedule, echoed bytes, bad)
     for idx, (frame, bad, _) in enumerate(schedule):
         if model.must_echo(frame):
-            expected.append((idx, model.echo(frame), bad))
+            # a runt is a bad frame even when the schedule does not flag it
+            expected.append((idx, model.echo(frame), model.is_bad(frame, bad)))
 
     errors = list(h.errors)
     outs = list(h.out_frames)
@@ -166,7 +167,7 @@ async def run_case(dut, name, schedule):
                         min(len(data), len(want)))
             errors.append(f"output frame {k} (input frame {idx}, {len(want)} B): first difference at byte {diff}"
                           f" (got {len(data)} B)")
-        elif not model.checksums_ok(data):
+        elif not want_bad and not model.checksums_ok(data):
             errors.append(f"output frame {k}: IP/UDP checksum invalid after the echo")
         if out_bad != want_bad:
             errors.append(f"output frame {k} (input frame {idx}): m_tuser {out_bad}, expected {want_bad}")

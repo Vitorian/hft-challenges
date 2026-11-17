@@ -41,9 +41,22 @@ def build(rng: random.Random, payload_len: int, *, dst_ip=ECHO_IP, dport=ECHO_PO
     return frame
 
 
+MIN_FRAME = 60   # Ethernet minimum without FCS: the MAC flags anything shorter (a runt) bad
+MATCH_BYTES = 38  # the fields the rule reads end with the UDP destination port, bytes 36-37
+
+
+def is_bad(f: bytes, bad=0) -> int:
+    """A frame arrives with s_tuser set when its FCS failed (`bad`) or it is a runt."""
+    return int(bool(bad) or len(f) < MIN_FRAME)
+
+
 def must_echo(f: bytes) -> bool:
-    """The challenge rule: echo IPv4 (no options) / UDP, unfragmented, to ECHO_IP:ECHO_PORT."""
-    if len(f) < 42:
+    """The challenge rule: echo IPv4 (no options) / UDP, unfragmented, to ECHO_IP:ECHO_PORT.
+
+    A runt that still carries every field the rule reads matches too. It is a bad frame (is_bad),
+    so the echo may drop it or send it with m_tuser set, like any other bad frame.
+    """
+    if len(f) < MATCH_BYTES:
         return False
     return (f[12:14] == b"\x08\x00" and f[14] == 0x45 and f[23] == 17
             and (struct.unpack("!H", f[20:22])[0] & 0x3FFF) == 0
