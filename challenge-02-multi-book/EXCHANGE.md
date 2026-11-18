@@ -12,9 +12,11 @@ consistent state after each one.
 ## Symbols
 
 - 200 symbols numbered `0` to `199`
-- 50 "hot" symbols (`0`-`49`) generate ~90% of message traffic
-- The remaining 150 "cold" symbols generate ~10%
-- Prices cluster near each symbol's mid-price (80% within 100 ticks)
+- A minority of "hot" symbols generates most of the message traffic; which
+  symbols are hot is not fixed, so do not tie your layout to symbol numbers
+- Prices are positive integers up to 1,000,000. Most cluster near each
+  symbol's mid-price; no tick size is guaranteed, and any price in the range
+  may arrive
 
 ## Order Types
 

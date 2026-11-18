@@ -14,7 +14,7 @@ Build a multi-symbol order book with queue position tracking and venue interacti
 
 ## Constraints
 
-- Prices are integers in the range `[1, 100_000]`
+- Prices are integers in the range `[1, 1_000_000]`; no tick size is guaranteed
 - Quantities are integers in the range `[1, 10_000]`
 - Up to 200 symbols, 1M+ active orders
 - Side is `0` for buy (bid), `1` for sell (ask)

@@ -156,7 +156,7 @@ struct WorkloadConfig {
     size_t timed_ops = 100'000;
     int max_our_orders = 50;
     int our_order_latency = 10;   // ops between send and corresponding ADD
-    int64_t max_price = 100'000;
+    int64_t max_price = 1'000'000;   // the contract: prices up to 1,000,000
     uint64_t seed = 42;
 };
 

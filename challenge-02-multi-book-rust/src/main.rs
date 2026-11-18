@@ -140,7 +140,7 @@ fn generate_workload(seed: u64) -> Workload {
     let timed_ops = 100_000usize;
     let max_our_orders = 50;
     let our_order_latency = 10;
-    let max_price: i64 = 100_000;
+    let max_price: i64 = 1_000_000; // the contract: prices up to 1,000,000
 
     let mut setup = Vec::with_capacity(setup_orders);
     let mut next_eid: u64 = 1;
