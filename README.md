@@ -114,6 +114,9 @@ nightly Vivado run: a score counts only once the design meets timing.
   or any other channel); the worker rejects solutions that print, exit, open files or touch
   the harness registries, and shows you only the names of failed checks. The public harness is
   identical to the certified one except for seeds, so measure locally
+- Memory mappings are allowed: `mmap`, `madvise`, huge pages, and an in-memory file
+  (`memfd_create`) used to map the same memory twice, as a mirrored ring buffer does. Nothing
+  in them leaves your process
 - **Rust**: solutions must be 100% safe Rust — `unsafe`, `std::process`, `std::net`,
   `std::fs`, `asm!` and FFI are rejected by the submission scanner
 - [Pre-installed libraries](https://hftuniversity.com/challenges/libraries) (Boost, Abseil,
