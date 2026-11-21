@@ -4,6 +4,8 @@
 //
 // A seqlock allows one writer and multiple readers to share data
 // without blocking. Readers retry if they detect a concurrent write.
+// A read() that relies on one wide load/store being indivisible, with
+// nothing that detects a torn read, is not accepted (since 2026-11-20).
 // No mutexes allowed in your final solution — this is a lock-free exercise.
 
 #include <cstdint>
