@@ -230,7 +230,12 @@ fn generate_workload(seed: u64) -> Workload {
                     op: Operation { op: OpType::Modify, id: our_active[idx].exchange_id, symbol: 0, side: 0, price: 0, qty: new_qty, aux: 0 } });
                 our_active[idx].qty = new_qty;
             } else {
-                let new_price = pick_price(&mut rng, our_active[idx].symbol, max_price);
+                let mut new_price = pick_price(&mut rng, our_active[idx].symbol, max_price);
+                // A re-quote must move: the venue answers a same-price modify
+                // with the old exchange id, so the new id would never arrive.
+                if new_price == our_active[idx].price {
+                    new_price = if new_price > 1 { new_price - 1 } else { new_price + 1 };
+                }
                 let new_qty = our_active[idx].qty;
                 let old_eid = our_active[idx].exchange_id;
                 let new_eid = next_eid; next_eid += 1;

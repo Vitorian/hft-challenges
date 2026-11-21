@@ -359,6 +359,10 @@ GeneratedWorkload generate_workload(const WorkloadConfig& cfg) {
             } else {
                 // Price change: loses position — cancel + add
                 int64_t new_price = pick_price(gen, oo.symbol, cfg.max_price);
+                // A re-quote must move: the venue answers a same-price modify
+                // with the old exchange id, so the new id would never arrive.
+                if (new_price == oo.price)
+                    new_price = oo.price > 1 ? oo.price - 1 : oo.price + 1;
                 int64_t new_qty = oo.qty;
                 uint64_t old_eid = oo.exchange_id;
                 uint64_t new_eid = next_eid++; // venue will assign this
