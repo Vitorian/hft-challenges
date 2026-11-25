@@ -7,6 +7,7 @@
 //   START: CPUID (serialize) -> RDTSC (read counter)
 //   END:   RDTSCP (read counter + serialize) -> CPUID (full drain)
 
+#include <type_traits>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
@@ -139,13 +140,23 @@ inline void do_not_optimize(T const& value) {
 #endif
 }
 
+// Small trivially copyable values go through a register; anything larger
+// stays in memory. A two-way "+m,r" operand is miscompiled by GCC 13 and 14 at
+// -O1 and up: on a double or float holding a constant it takes the memory form,
+// drops the store and reads back stack garbage, and a 24-byte TopLevel came
+// back corrupted (found 2026-11-25).
 template <typename T>
-inline void do_not_optimize(T& value) {
-#if defined(__clang__)
-    asm volatile("" : "+r,m"(value) : : "memory");
-#else
-    asm volatile("" : "+m,r"(value) : : "memory");
-#endif
+inline typename std::enable_if<std::is_trivially_copyable<T>::value &&
+                               (sizeof(T) <= sizeof(T*))>::type
+do_not_optimize(T& value) {
+    asm volatile("" : "+r"(value) : : "memory");
+}
+
+template <typename T>
+inline typename std::enable_if<!std::is_trivially_copyable<T>::value ||
+                               (sizeof(T) > sizeof(T*))>::type
+do_not_optimize(T& value) {
+    asm volatile("" : "+m"(value) : : "memory");
 }
 
 inline void clobber() {
