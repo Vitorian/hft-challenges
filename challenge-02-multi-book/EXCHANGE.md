@@ -28,6 +28,21 @@ market orders, stop orders, or iceberg orders.
 - `0` = **bid** (buy)
 - `1` = **ask** (sell)
 
+## Order Ids
+
+An `exchange_id` is an opaque 64-bit number, as on a real venue:
+
+- The exchange numbers every new order on the venue, across all its
+  instruments and not only your 200 symbols, so ids are large and the ids you
+  see have gaps between them
+- No two orders in a run share an id, and an order keeps its id until it is
+  cancelled (a price change or quantity increase cancels it, see below)
+- Ids mostly increase, but not always: an order entered long ago can arrive
+  with an id far below the others
+- Do not assume any range, density or spacing. Two live orders can share any
+  number of low bits, so a table indexed by part of the id must handle
+  collisions
+
 ## Our Orders vs Exchange Orders
 
 Your `MultiOrderBook` must track two categories of orders:
@@ -119,6 +134,15 @@ approximately:
 | get_top_levels | 5% |
 | volume_near_best | 5% |
 | get_queue_position | 5% |
+
+## Correctness
+
+Your book and a reference book replay the same workload. Every
+`best_bid` / `best_ask` answer (price, qty, count) and every
+`get_queue_position` answer must match the reference, and at the end so must
+every level of every symbol as `get_top_levels` reports it. The benchmark
+in this folder runs these checks on a public seed; the certified run uses
+seeds of its own. A run that fails them is not scored.
 
 ## Scoring
 

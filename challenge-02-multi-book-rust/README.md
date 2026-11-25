@@ -18,12 +18,20 @@ Build a multi-symbol order book with queue position tracking and venue interacti
 - Quantities are integers in the range `[1, 10_000]`
 - Up to 200 symbols, 1M+ active orders
 - Side is `0` for buy (bid), `1` for sell (ask)
+- Exchange ids are opaque 64-bit numbers, as on a real venue: large, with gaps
+  between the ids you see, mostly but not always increasing, unique among the
+  orders of a run. Do not assume any range or density; a table indexed by part
+  of the id must handle collisions. Full rules: `../challenge-02-multi-book/EXCHANGE.md`
 
 ## What We Benchmark
 
 - Mixed workload: 35% add, 20% cancel, 10% modify, 10% best_bid/ask, 5% send_our, 5% top_levels, 5% volume_near_best, 5% queue_position, 3% modify_our, 2% cancel_our
 - 500,000 orders pre-filled before timing
 - Measured in x86-64 CPU cycles per operation via `rdtscp` (lower is better)
+- Correctness: your book and a reference book replay the same workload; every
+  best bid/ask (price, qty, count) and queue-position answer must match, and so
+  must every level of every symbol at the end. `cargo run --release` runs the
+  same checks on a public seed
 
 ## Files
 
@@ -35,5 +43,5 @@ Build a multi-symbol order book with queue position tracking and venue interacti
 ## Limits
 
 - Time: 120 seconds
-- Memory: 1024 MB
+- Memory: 2048 MB
 - Daily submissions: 10
