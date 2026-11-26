@@ -127,6 +127,50 @@ impl Oracle {
     }
 }
 
+/// The same oracle for streams too long to keep: events older than
+/// cutoff - precision can never count again, so they are dropped. Memory stays
+/// at the events of one window plus 2 * precision.
+struct WindowOracle {
+    interval: i64,
+    precision: i64,
+    t: i64,
+    ev: std::collections::VecDeque<(i64, u64)>,
+    lo_i: usize,
+    sum_lo: u64,
+    sum_hi: u64,
+    total: u64,
+}
+
+impl WindowOracle {
+    fn new(interval: i64, precision: i64) -> Self {
+        WindowOracle { interval, precision, t: 0, ev: std::collections::VecDeque::new(), lo_i: 0, sum_lo: 0, sum_hi: 0, total: 0 }
+    }
+    fn update(&mut self, t: i64) {
+        self.t = t;
+    }
+    fn add_event(&mut self, c: u64) {
+        self.ev.push_back((self.t, c));
+        self.total += c;
+    }
+    fn bounds(&mut self) -> (u64, u64) {
+        let cutoff = self.t - self.interval;
+        // lo first: every event the hi cursor drops is also <= cutoff + precision
+        while self.lo_i < self.ev.len() && self.ev[self.lo_i].0 <= cutoff + self.precision {
+            self.sum_lo += self.ev[self.lo_i].1;
+            self.lo_i += 1;
+        }
+        while let Some(&(time, c)) = self.ev.front() {
+            if time >= cutoff - self.precision {
+                break;
+            }
+            self.sum_hi += c;
+            self.ev.pop_front();
+            self.lo_i -= 1;
+        }
+        (self.total - self.sum_lo, self.total - self.sum_hi)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The timed loop: the solution's three calls, an add and one store per op.
 // ---------------------------------------------------------------------------
@@ -413,6 +457,42 @@ fn edge_cases() -> bool {
     pass
 }
 
+/// A dense deep window: 1 ns precision, a 32 ms window, an event every 1-2 ns,
+/// so about 21 million distinct event times (more than 2^24) are inside the
+/// window at once, streamed for 1.6 windows past the point where it is full.
+/// Any interval and precision are legal and the stream only has to be
+/// monotonic, so a counter that keeps the window in a structure of fixed
+/// capacity below that, or widens its buckets past the precision, drops events
+/// that are still inside. An honest record fits the memory limit: a deque of
+/// the events is ~350 MB, one slot per nanosecond of the window ~260 MB.
+fn dense_window() -> bool {
+    const I: i64 = 32_000_000;
+    const P: i64 = 1;
+    const N: usize = 56_000_000; // ~84 ms of stream: 2.6 windows
+    let mut rc = MyRollingCounter::new(I, P);
+    let mut o = WindowOracle::new(I, P);
+    let mut rng = Rng::new(SEED_VALIDATION ^ 0x9999_9999_9999_9999);
+    let mut t = 1_000_000_000_000i64 + rng.next_range(1u64 << 40) as i64;
+    for j in 0..N {
+        t += 1 + rng.next_range(2) as i64;
+        let ev = 1 + rng.next_range(3);
+        rc.update(t);
+        o.update(t);
+        rc.add_event(ev as usize);
+        o.add_event(ev);
+        let (lo, hi) = o.bounds();
+        let got = rc.count() as u64;
+        if got < lo || got > hi {
+            return fail(
+                "dense_window",
+                format!("32 ms window at 1 ns precision, an event every 1-2 ns: op {}: count {} outside [{}, {}]", j, got, lo, hi),
+            );
+        }
+    }
+    eprintln!("  dense window: {} ops, ~21M event times inside a 32 ms window at 1 ns precision", N);
+    true
+}
+
 fn main() {
     // The timed passes, before the harness runs anything.
     let scored = run_scored(&W_STANDARD);
@@ -420,6 +500,7 @@ fn main() {
     let mut harness = hftu_bench::Harness::new();
     harness.add_validation("correctness", correctness);
     harness.add_validation("edge_cases", edge_cases);
+    harness.add_validation("dense_window", dense_window);
     let failure = scored.failure.clone();
     harness.add_validation("scored_counts", move || match &failure {
         None => {

@@ -26,6 +26,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <vector>
 
 namespace {
@@ -95,6 +96,28 @@ public:
         const int64_t cutoff = t_ - interval_;
         while (hi_i_ < ev_.size() && ev_[hi_i_].first < cutoff - precision_) { sum_hi_ += ev_[hi_i_].second; ++hi_i_; }
         while (lo_i_ < ev_.size() && ev_[lo_i_].first <= cutoff + precision_) { sum_lo_ += ev_[lo_i_].second; ++lo_i_; }
+        hi = total_ - sum_hi_;
+        lo = total_ - sum_lo_;
+    }
+};
+
+// The same oracle for streams too long to keep: events older than
+// cutoff - precision can never count again, so they are dropped. Memory stays
+// at the events of one window plus 2 * precision.
+class WindowOracle {
+    int64_t interval_, precision_, t_ = 0;
+    std::deque<std::pair<int64_t, uint64_t>> ev_;
+    size_t lo_i_ = 0;
+    uint64_t sum_lo_ = 0, sum_hi_ = 0, total_ = 0;
+public:
+    WindowOracle(int64_t interval, int64_t precision) : interval_(interval), precision_(precision) {}
+    void update(int64_t t) { t_ = t; }
+    void addEvent(uint64_t c) { ev_.push_back({t_, c}); total_ += c; }
+    void bounds(uint64_t& lo, uint64_t& hi) {
+        const int64_t cutoff = t_ - interval_;
+        // lo first: every event the hi cursor drops below is also <= cutoff + precision
+        while (lo_i_ < ev_.size() && ev_[lo_i_].first <= cutoff + precision_) { sum_lo_ += ev_[lo_i_].second; ++lo_i_; }
+        while (!ev_.empty() && ev_.front().first < cutoff - precision_) { sum_hi_ += ev_.front().second; ev_.pop_front(); --lo_i_; }
         hi = total_ - sum_hi_;
         lo = total_ - sum_lo_;
     }
@@ -399,6 +422,38 @@ static hftu::RegisterValidation val_edge_cases("edge_cases", []() -> bool {
     }
     if (pass) std::fprintf(stderr, "  edge cases: all passed\n");
     return pass;
+});
+
+// A dense deep window: 1 ns precision, a 32 ms window, an event every 1-2 ns,
+// so about 21 million distinct event times (more than 2^24) are inside the
+// window at once, streamed for 1.5 windows past the point where it is full.
+// The constructor accepts any interval and precision and the stream only has
+// to be monotonic, so a counter that keeps the window in a structure of fixed
+// capacity below that, or widens its buckets past the precision, drops events
+// that are still inside. An honest record fits the memory limit: a deque of
+// the events is ~350 MB, one slot per nanosecond of the window ~260 MB.
+static hftu::RegisterValidation val_dense("dense_window", []() -> bool {
+    const char* T = "dense_window";
+    constexpr int64_t I = 32'000'000LL, P = 1;
+    constexpr size_t N = 56'000'000;          // ~84 ms of stream: 2.6 windows
+    hftu::RollingCounter rc(I, P);
+    WindowOracle o(I, P);
+    hftu::Rng rng(SEED_VALIDATION ^ 0x9999999999999999ULL);
+    int64_t t = 1'000'000'000'000LL + static_cast<int64_t>(rng.next_range(1ULL << 40));
+    for (size_t j = 0; j < N; ++j) {
+        t += 1 + static_cast<int64_t>(rng.next_range(2));
+        const uint64_t ev = 1 + rng.next_range(3);
+        rc.update(t); o.update(t);
+        rc.addEvent(ev); o.addEvent(ev);
+        uint64_t lo, hi;
+        o.bounds(lo, hi);
+        const uint64_t got = rc.count();
+        if (got < lo || got > hi)
+            return fail(T, "32 ms window at 1 ns precision, an event every 1-2 ns: op %zu: count %llu outside [%llu, %llu]",
+                        j, (unsigned long long)got, (unsigned long long)lo, (unsigned long long)hi);
+    }
+    std::fprintf(stderr, "  dense window: %zu ops, ~21M event times inside a 32 ms window at 1 ns precision\n", N);
+    return true;
 });
 
 // The scored runs themselves: every recorded count() of every timed pass.
